@@ -7,9 +7,10 @@ S. Mack, 30.8.20
 import time
 import numpy as np
 import tkinter as tk
+import tkinter.messagebox as tkm
 import config as cf
 from aliceAwgFunc import ReMakeAWGwaves
-#from aliceMenus import UpdateSettingsMenu, UpdateMeasureMenu # Gbit Fehler "cirdular import"
+import aliceMenus as am
 from aliceOsciFunc import (BStop, BStart, UpdateTimeAll, UpdateTimeTrace,
 UpdateTimeScreen,ReInterploateTrigger, FindTriggerSample)
 
@@ -21,21 +22,18 @@ ADsignal1 = []              # Ain signal array channel A and B
 TRACEresetTime = True # True for first new trace, False for averageing
 
 InOffA = InGainA = InOffB = InGainB = 0.0 # Variablen für Input aus UI
+CurOffA = CurOffB = CurGainA = CurGainB = 0.0
 
+Alternate_Sweep_Mode = 1 # 1 wenn drei oder mehr Signale gesampelt werden
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # M1K Samplingfunktionen
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
         
-def Analog_In():
-    global SingleShot
-    global nStatus, CutDC
-    global MuxSync
-    global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
-    
-    while (True):       # Main loop
+def Analog_In():  
+    while (True):
         if (cf.RUNstatus.get() == 1) or (cf.RUNstatus.get() == 2):
             if cf.SettingsStatus.get() == 1:
-                UpdateSettingsMenu() # Make sure current entries in Settings controls are up to date
+                am.UpdateSettingsMenu() # Make sure current entries in Settings controls are up to date
             Analog_Time_In()
         cf.root.update_idletasks()
         cf.root.update()
@@ -43,8 +41,7 @@ def Analog_In():
 #---Read the analog data and store the data into the arrays
 def Analog_Time_In():
     global InOffA, InGainA, InOffB, InGainB
-    global CurOffA, CurOffB, CurGainA, CurGainB
-    
+    global CurOffA, CurOffB, CurGainA, CurGainB 
     # get time scale
     try:
         cf.TIMEdiv = eval(cf.TMsb.get())
@@ -91,8 +88,6 @@ def Analog_Time_In():
         CurGainB = float(cf.CHBIGainEntry.get())
     except:
         CurGainB = 1.0
-## Es gibt wohl zwei verschiedene Samplingmethoden: slow und fast
-## slow wird bei >500 ms/Div verwtk.ENDet, fast bei einer größeren Zeitablenkung
 # Dedecide which Fast or Slow sweep routine to call
     if cf.TIMEdiv > 500:
         Analog_Slow_time() # failed attempt as rolling trace
@@ -105,11 +100,8 @@ def Analog_Slow_time():
     global ADsignal1
     global VmemoryA, VmemoryB, ImemoryA, ImemoryB
     global HozPoss
-    global LShift
-    global CHA, CHB
     global TRACEsize, First_Slow_sweep, ShiftPointer
-    global SingleShot
-    global hldn, Is_Triggered
+    global hldn
     global TRACErefresh
     global SCREENrefresh, DCrefresh
     global InOffA, InGainA, InOffB, InGainB, CurOffA, CurOffB, CurGainA, CurGainB
@@ -193,19 +185,16 @@ def Analog_Slow_time():
 ## Wie unterscheidet sich dieses Sampling vom Slow Mode?
 #---routine for time scales faster than 500 mSec/Div
 def Analog_Fast_time():
-    global ADsignal1
+    global ADsignal1, Alternate_Sweep_Mode
     global VmemoryA, VmemoryB, ImemoryA, ImemoryB
     global HozPoss
-    global LShift
-    global CHA, CHB
-    global TRACEsize,TRACEresetTime
-    global SingleShot
-    global TIMEdiv1x, hldn, Is_Triggered, LPFTrigger
+    global TRACEresetTime
+    global TIMEdiv1x, hldn
     global TRACErefresh
     global SCREENrefresh, DCrefresh
     global InOffA, InGainA, InOffB, InGainB, CurOffA, CurOffB, CurGainA, CurGainB
     global cha_A1Entry, cha_A2Entry, chb_A1Entry, chb_A2Entry
-    global cal, Alternate_Sweep_Mode, Last_ADC_Mux_Mode
+    global cal, Last_ADC_Mux_Mode
     global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
 
     if cf.TRACEmodeTime.get() == 0 and TRACEresetTime == False:
@@ -220,14 +209,14 @@ def Analog_Fast_time():
         ImemoryB = cf.IBuffB
 
     try:
-        HoldOff = float(eval(cf.HoldOffentry.get()))
-        if HoldOff < 0:
-            HoldOff = 0
+        cf.HoldOff = float(eval(cf.HoldOffentry.get()))
+        if cf.HoldOff < 0:
+            cf.HoldOff = 0
             cf.HoldOffentry.delete(0,tk.END)
-            cf.HoldOffentry.insert(0, HoldOff)
+            cf.HoldOffentry.insert(0, cf.HoldOff)
     except:
         cf.HoldOffentry.delete(0,tk.END)
-        cf.HoldOffentry.insert(0, HoldOff)
+        cf.HoldOffentry.insert(0, cf.HoldOff)
 #
     try:
         HozPoss = float(eval(cf.HozPossentry.get()))
@@ -235,7 +224,7 @@ def Analog_Fast_time():
         cf.HozPossentry.delete(0,tk.END)
         cf.HozPossentry.insert(0, HozPoss)
 
-    hldn = int(HoldOff * cf.SAMPLErate/1000 )
+    hldn = int(cf.HoldOff * cf.SAMPLErate/1000 )
     hozpos = int(HozPoss * cf.SAMPLErate/1000 )
     if hozpos < 0:
         hozpos = 0
@@ -269,7 +258,7 @@ def Analog_Fast_time():
         cf.devx.ctrl_transfer( 0x40, 0x51, 38, 0, 0, 0, 100) # set CHB GND switch to open
     
     # MUX-Modi: Modus 0 macht für Sensortechnik am meisten Sinn, wenn für Ultraschallsensor mit 200.000 S/s
-    if Alternate_Sweep_Mode.get() == 1 and cf.Two_X_Sample.get() == 1:
+    if Alternate_Sweep_Mode == 1 and cf.Two_X_Sample.get() == 1:
         if cf.ADC_Mux_Mode.get() == 0: # VA and VB
             cf.VBuffA = [] # Clear the V Buff array for trace A
             cf.VBuffB = [] # Clear the V Buff array for trace B
@@ -298,78 +287,78 @@ def Analog_Fast_time():
     
         if cf.Two_X_Sample.get() == 1 and cf.ADC_Mux_Mode.get() < 6:
             if cf.ADC_Mux_Mode.get() == 0: # VA and VB
-                cf.VBuffA.apptk.END(ADsignal1[index][0][0])
-                cf.VBuffA.apptk.END(ADsignal1[index][1][1])
-                cf.VBuffB.apptk.END(ADsignal1[index][0][1])
-                cf.VBuffB.apptk.END(ADsignal1[index][1][0])
-                if Alternate_Sweep_Mode.get() == 0:
-                    cf.IBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffB.apptk.END(0.0) # fill as a place holder
+                cf.VBuffA.append(ADsignal1[index][0][0])
+                cf.VBuffA.append(ADsignal1[index][1][1])
+                cf.VBuffB.append(ADsignal1[index][0][1])
+                cf.VBuffB.append(ADsignal1[index][1][0])
+                if Alternate_Sweep_Mode == 0:
+                    cf.IBuffA.append(0.0) # fill as a place holder
+                    cf.IBuffA.append(0.0) # fill as a place holder
+                    cf.IBuffB.append(0.0) # fill as a place holder
+                    cf.IBuffB.append(0.0) # fill as a place holder
             elif cf.ADC_Mux_Mode.get() == 1: # IA and IB
-                cf.IBuffA.apptk.END(ADsignal1[index][0][1])
-                cf.IBuffA.apptk.END(ADsignal1[index][1][0])
-                cf.IBuffB.apptk.END(ADsignal1[index][0][0])
-                cf.IBuffB.apptk.END(ADsignal1[index][1][1])
-                if Alternate_Sweep_Mode.get() == 0:
-                    cf.VBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.VBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.VBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.VBuffB.apptk.END(0.0) # fill as a place holder
+                cf.IBuffA.append(ADsignal1[index][0][1])
+                cf.IBuffA.append(ADsignal1[index][1][0])
+                cf.IBuffB.append(ADsignal1[index][0][0])
+                cf.IBuffB.append(ADsignal1[index][1][1])
+                if Alternate_Sweep_Mode == 0:
+                    cf.VBuffA.append(0.0) # fill as a place holder
+                    cf.VBuffA.append(0.0) # fill as a place holder
+                    cf.VBuffB.append(0.0) # fill as a place holder
+                    cf.VBuffB.append(0.0) # fill as a place holder
             elif cf.ADC_Mux_Mode.get() == 2: # VA and IB
-                cf.VBuffA.apptk.END((ADsignal1[index][0][1])/1024.0)
-                cf.VBuffA.apptk.END((ADsignal1[index][1][0])/1024.0)
+                cf.VBuffA.append((ADsignal1[index][0][1])/1024.0)
+                cf.VBuffA.append((ADsignal1[index][1][0])/1024.0)
                 #
-                cf.IBuffB.apptk.END( ((ADsignal1[index][0][0])/4096.0)-0.5 )
-                cf.IBuffB.apptk.END( ((ADsignal1[index][1][1])/4096.0)-0.5 ) 
+                cf.IBuffB.append( ((ADsignal1[index][0][0])/4096.0)-0.5 )
+                cf.IBuffB.append( ((ADsignal1[index][1][1])/4096.0)-0.5 ) 
                 #
-                if Alternate_Sweep_Mode.get() == 0:
-                    cf.VBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.VBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffA.apptk.END(0.0) # fill as a place holder
+                if Alternate_Sweep_Mode == 0:
+                    cf.VBuffB.append(0.0) # fill as a place holder
+                    cf.VBuffB.append(0.0) # fill as a place holder
+                    cf.IBuffA.append(0.0) # fill as a place holder
+                    cf.IBuffA.append(0.0) # fill as a place holder
             elif cf.ADC_Mux_Mode.get() == 3: # VB and IA
-                cf.VBuffB.apptk.END((ADsignal1[index][0][0])/1024.0)
-                cf.VBuffB.apptk.END((ADsignal1[index][1][1])/1024.0)
+                cf.VBuffB.append((ADsignal1[index][0][0])/1024.0)
+                cf.VBuffB.append((ADsignal1[index][1][1])/1024.0)
                 #
-                cf.IBuffA.apptk.END( ((ADsignal1[index][0][1])/4096.0)-0.5 )
-                cf.IBuffA.apptk.END( ((ADsignal1[index][1][0])/4096.0)-0.5 )
+                cf.IBuffA.append( ((ADsignal1[index][0][1])/4096.0)-0.5 )
+                cf.IBuffA.append( ((ADsignal1[index][1][0])/4096.0)-0.5 )
                 #
-                if Alternate_Sweep_Mode.get() == 0:
-                    cf.VBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.VBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffB.apptk.END(0.0) # fill as a place holder
+                if Alternate_Sweep_Mode == 0:
+                    cf.VBuffA.append(0.0) # fill as a place holder
+                    cf.VBuffA.append(0.0) # fill as a place holder
+                    cf.IBuffB.append(0.0) # fill as a place holder
+                    cf.IBuffB.append(0.0) # fill as a place holder
             elif cf.ADC_Mux_Mode.get() == 4: # VA and IA
-                cf.VBuffA.apptk.END(ADsignal1[index][0][0])
-                cf.VBuffA.apptk.END(ADsignal1[index][1][1])
-                cf.IBuffA.apptk.END(ADsignal1[index][0][1])
-                cf.IBuffA.apptk.END(ADsignal1[index][1][0])
-                if Alternate_Sweep_Mode.get() == 0:
-                    cf.VBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.VBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffB.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffB.apptk.END(0.0) # fill as a place holder
+                cf.VBuffA.append(ADsignal1[index][0][0])
+                cf.VBuffA.append(ADsignal1[index][1][1])
+                cf.IBuffA.append(ADsignal1[index][0][1])
+                cf.IBuffA.append(ADsignal1[index][1][0])
+                if Alternate_Sweep_Mode == 0:
+                    cf.VBuffB.append(0.0) # fill as a place holder
+                    cf.VBuffB.append(0.0) # fill as a place holder
+                    cf.IBuffB.append(0.0) # fill as a place holder
+                    cf.IBuffB.append(0.0) # fill as a place holder
             elif cf.ADC_Mux_Mode.get() == 5: # VB and IB
-                cf.VBuffB.apptk.END(ADsignal1[index][0][1])
-                cf.VBuffB.apptk.END(ADsignal1[index][1][0])
-                cf.IBuffB.apptk.END(ADsignal1[index][0][0])
-                cf.IBuffB.apptk.END(ADsignal1[index][1][1])
-                if Alternate_Sweep_Mode.get() == 0:
-                    cf.VBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.VBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffA.apptk.END(0.0) # fill as a place holder
-                    cf.IBuffA.apptk.END(0.0) # fill as a place holder
+                cf.VBuffB.append(ADsignal1[index][0][1])
+                cf.VBuffB.append(ADsignal1[index][1][0])
+                cf.IBuffB.append(ADsignal1[index][0][0])
+                cf.IBuffB.append(ADsignal1[index][1][1])
+                if Alternate_Sweep_Mode == 0:
+                    cf.VBuffA.append(0.0) # fill as a place holder
+                    cf.VBuffA.append(0.0) # fill as a place holder
+                    cf.IBuffA.append(0.0) # fill as a place holder
+                    cf.IBuffA.append(0.0) # fill as a place holder
         else:
-            cf.VBuffA.apptk.END(ADsignal1[index][0][0])
-            cf.IBuffA.apptk.END(ADsignal1[index][0][1])
-            cf.VBuffB.apptk.END(ADsignal1[index][1][0])
-            cf.IBuffB.apptk.END(ADsignal1[index][1][1])
+            cf.VBuffA.append(ADsignal1[index][0][0])
+            cf.IBuffA.append(ADsignal1[index][0][1])
+            cf.VBuffB.append(ADsignal1[index][1][0])
+            cf.IBuffB.append(ADsignal1[index][1][1])
         index = index + increment
 #
     cf.SHOWsamples = len(cf.VBuffA)
-    if Alternate_Sweep_Mode.get() == 1 and cf.Two_X_Sample.get() == 1:
+    if Alternate_Sweep_Mode == 1 and cf.Two_X_Sample.get() == 1:
         if cf.ADC_Mux_Mode.get() == 0: # VA and VB
             cf.VBuffA = np.array(cf.VBuffA)
             cf.VBuffB = np.array(cf.VBuffB)
@@ -411,7 +400,7 @@ def Analog_Fast_time():
 
     
 # Find trigger sample point if necessary
-    LShift = 0
+    cf.LShift = 0
     if cf.TgInput.get() == 1:
         FindTriggerSample(cf.VBuffA)
     if cf.TgInput.get() == 2:
@@ -423,11 +412,11 @@ def Analog_Fast_time():
     if cf.TRACEmodeTime.get() == 1 and TRACEresetTime == False:
         # Average mode 1, add difference / TRACEaverage to array
         if cf.TgInput.get() > 0: # if triggering left shift all arrays such that trigger point is at index 0
-            LShift = 0 - cf.TRIGGERsample
-            cf.VBuffA = np.roll(cf.VBuffA, LShift)
-            cf.VBuffB = np.roll(cf.VBuffB, LShift)
-            cf.IBuffA = np.roll(cf.IBuffA, LShift)
-            cf.IBuffB = np.roll(cf.IBuffB, LShift)
+            cf.LShift = 0 - cf.TRIGGERsample
+            cf.VBuffA = np.roll(cf.VBuffA, cf.LShift)
+            cf.VBuffB = np.roll(cf.VBuffB, cf.LShift)
+            cf.IBuffA = np.roll(cf.IBuffA, cf.LShift)
+            cf.IBuffB = np.roll(cf.IBuffB, cf.LShift)
             cf.TRIGGERsample = hozpos # set trigger sample to index 0 offset by horizontal position
         try:
             cf.VBuffA = VmemoryA + (cf.VBuffA - VmemoryA) / cf.TRACEaverage.get()
@@ -449,34 +438,34 @@ def Analog_Fast_time():
         if cf.TgInput.get() == 4:
             ReInterploateTrigger(cf.IBuffB)
     # DC value = average of the data record
-    tk.ENDsample = cf.SHOWsamples - 10 # average over all samples
+    Endsample = cf.SHOWsamples - 10 # average over all samples
     ## Berechnung Messwerte im Fast Scan Modus auch für jeden Trace            
-    cf.DCV1 = np.mean(cf.VBuffA[hldn:tk.ENDsample])
-    cf.DCV2 = np.mean(cf.VBuffB[hldn:tk.ENDsample])
+    cf.DCV1 = np.mean(cf.VBuffA[hldn:Endsample])
+    cf.DCV2 = np.mean(cf.VBuffB[hldn:Endsample])
     # convert current values to mA
-    cf.DCI1 = np.mean(cf.IBuffA[hldn:tk.ENDsample])
-    cf.DCI2 = np.mean(cf.IBuffB[hldn:tk.ENDsample])
+    cf.DCI1 = np.mean(cf.IBuffA[hldn:Endsample])
+    cf.DCI2 = np.mean(cf.IBuffB[hldn:Endsample])
     # find min and max values
-    cf.MinV1 = np.amin(cf.VBuffA[hldn:tk.ENDsample])
-    cf.MaxV1 = np.amax(cf.VBuffA[hldn:tk.ENDsample])
-    cf.MinV2 = np.amin(cf.VBuffB[hldn:tk.ENDsample])
-    cf.MaxV2 = np.amax(cf.VBuffB[hldn:tk.ENDsample])
-    cf.MinI1 = np.amin(cf.IBuffA[hldn:tk.ENDsample])
-    cf.MaxI1 = np.amax(cf.IBuffA[hldn:tk.ENDsample])
-    cf.MinI2 = np.amin(cf.IBuffB[hldn:tk.ENDsample])
-    cf.MaxI2 = np.amax(cf.IBuffB[hldn:tk.ENDsample])
+    cf.MinV1 = np.amin(cf.VBuffA[hldn:Endsample])
+    cf.MaxV1 = np.amax(cf.VBuffA[hldn:Endsample])
+    cf.MinV2 = np.amin(cf.VBuffB[hldn:Endsample])
+    cf.MaxV2 = np.amax(cf.VBuffB[hldn:Endsample])
+    cf.MinI1 = np.amin(cf.IBuffA[hldn:Endsample])
+    cf.MaxI1 = np.amax(cf.IBuffA[hldn:Endsample])
+    cf.MinI2 = np.amin(cf.IBuffB[hldn:Endsample])
+    cf.MaxI2 = np.amax(cf.IBuffB[hldn:Endsample])
     # RMS value = square root of average of the data record squared
-    cf.SV1 = np.sqrt(np.mean(np.square(cf.VBuffA[hldn:tk.ENDsample])))
-    cf.SI1 = np.sqrt(np.mean(np.square(cf.IBuffA[hldn:tk.ENDsample])))
-    cf.SV2 = np.sqrt(np.mean(np.square(cf.VBuffB[hldn:tk.ENDsample])))
-    cf.SI2 = np.sqrt(np.mean(np.square(cf.IBuffB[hldn:tk.ENDsample])))
-    cf.SVA_B = np.sqrt(np.mean(np.square(cf.VBuffA[hldn:tk.ENDsample]-cf.VBuffB[hldn:tk.ENDsample])))
+    cf.SV1 = np.sqrt(np.mean(np.square(cf.VBuffA[hldn:Endsample])))
+    cf.SI1 = np.sqrt(np.mean(np.square(cf.IBuffA[hldn:Endsample])))
+    cf.SV2 = np.sqrt(np.mean(np.square(cf.VBuffB[hldn:Endsample])))
+    cf.SI2 = np.sqrt(np.mean(np.square(cf.IBuffB[hldn:Endsample])))
+    cf.SVA_B = np.sqrt(np.mean(np.square(cf.VBuffA[hldn:Endsample]-cf.VBuffB[hldn:Endsample])))
 
     UpdateTimeAll()         # Update Data, trace and time screen
        # Update Data, trace
-    if SingleShot.get() > 0 and Is_Triggered == 1: # Singel Shot trigger is on
+    if cf.SingleShot.get() > 0 and cf.Is_Triggered == 1: # Singel Shot trigger is on
         BStop() # 
-        SingleShot.set(0)
+        cf.SingleShot.set(0)
     if cf.ManualTrigger.get() == 1: # Manual trigger is on
         BStop() # 
     if (cf.RUNstatus.get() == 3) or (cf.RUNstatus.get() == 4):
@@ -532,8 +521,13 @@ def SetADC_Mux():
 # Der ADC_Mux _Mode wird über unterschiedliche Menüs gesetzt: Samplinrate oder hier das Aktivieren der unterschiedlichen Kanäle.
 # Das ist wohl der Grund wieso für die Hardware der Mux-Mode mit cf.devx.set_mux_mode() eingestellt wird. Die Tkinter-Variable ADC_Mux_Mode
 # ist in erster Linie dafür da, die Buttons auszulesen und deren Zustand zu setzen.
-    global CHA, CHB
-    global v1_adc_conf, i1_adc_conf, v2_adc_conf, i2_adc_conf
+#    if not cf.DevID == "No Device":
+#        tkm.showwarning("WARNING","No Device Plugged In!")
+#        return 
+    v1_adc_conf = 0x20F1 # ADC Mux defaults
+    i1_adc_conf = 0x20F7
+    v2_adc_conf = 0x20F7
+    i2_adc_conf = 0x20F1
     #!! ADC_Mux_Mode und cf.devx Mux Mode teils nicht gleich
     if cf.Two_X_Sample.get() == 1:
     # Der Mux-Mode hat was damit zu tun, welche Kombination von VA, IA, VB und IB abgetastet wird
@@ -580,38 +574,38 @@ def TraceSelectADC_Mux():
     if cf.devx != None:
         if cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # All four traces
-            Alternate_Sweep_Mode.set(1)
+            Alternate_Sweep_Mode = 1
         elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 0:
             cf.ADC_Mux_Mode.set(0) # three traces
-            Alternate_Sweep_Mode.set(1)
+            Alternate_Sweep_Mode = 1
         elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # three traces
-            Alternate_Sweep_Mode.set(1)
+            Alternate_Sweep_Mode = 1
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # three traces
-            Alternate_Sweep_Mode.set(1)
+            Alternate_Sweep_Mode = 1
         elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # three traces
-            Alternate_Sweep_Mode.set(1)
+            Alternate_Sweep_Mode = 1
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(1) # IA and IB
-            Alternate_Sweep_Mode.set(0)
+            Alternate_Sweep_Mode = 0
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 0:
             cf.ADC_Mux_Mode.set(1) # just IA
-            Alternate_Sweep_Mode.set(0)
+            Alternate_Sweep_Mode = 0
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(1) # just IB
-            Alternate_Sweep_Mode.set(0)
+            Alternate_Sweep_Mode = 0
         elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 0:
             cf.ADC_Mux_Mode.set(4) # VA and IA
-            Alternate_Sweep_Mode.set(0)
+            Alternate_Sweep_Mode = 0
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(5) # VB and IB
-            Alternate_Sweep_Mode.set(0)
+            Alternate_Sweep_Mode = 0
             # VA und IB (Mux Mode 2) bzw. VB und IA (3) sind nicht vorgesehen.
         else:
             cf.ADC_Mux_Mode.set(0)
-            #Alternate_Sweep_Mode.set(0) # gibt Laufzeitfehler
+            Alternate_Sweep_Mode = 0
         SetADC_Mux()
         UpdateTimeTrace()
         
@@ -620,21 +614,21 @@ def TraceSelectADC_Mux():
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Hier wird für den AWG die doppelte Samplingrate eingestellt:
 # Wie macht man VA und VB mit doppelter Samplingrate?
-def BAWG2X():
-    ReMakeAWGwaves()
-    if cf.AWG_2X == 0: # configure board for both AWG channels at 1X sampling
-        cf.devx.ctrl_transfer(0x40, 0x24, 0x0, 0, 0, 0, 100) # set to addr DAC A 
-        cf.devx.ctrl_transfer(0x40, 0x25, 0x1, 0, 0, 0, 100) # set to addr DAC B
-    elif cf.AWG_2X == 1: # configure board for single AWG channel A at 2X sampling
-        cf.devx.ctrl_transfer(0x40, 0x24, 0x0, 0, 0, 0, 100) # set to addr DAC A 
-        cf.devx.ctrl_transfer(0x40, 0x25, 0x0, 0, 0, 0, 100) # set t0 addr DAC A
-        cf.devx.ctrl_transfer(0x40, 0x51, 40, 0, 0, 0, 100) # set IN3 switch to open
-        cf.devx.ctrl_transfer(0x40, 0x51, 52, 0, 0, 0, 100) # set IN3 switch to open
-    elif cf.AWG_2X == 2: # configure board for single AWG channel B at 2X sampling
-        cf.devx.ctrl_transfer(0x40, 0x24, 0x1, 0, 0, 0, 100) # set to addr DAC B 
-        cf.devx.ctrl_transfer(0x40, 0x25, 0x1, 0, 0, 0, 100) # set to addr DAC B
-        cf.devx.ctrl_transfer(0x40, 0x51, 35, 0, 0, 0, 100) # set IN3 switch to open
-        cf.devx.ctrl_transfer(0x40, 0x51, 51, 0, 0, 0, 100) # set IN3 switch to open
+#def BAWG2X():
+#    ReMakeAWGwaves()
+#    if cf.AWG_2X == 0: # configure board for both AWG channels at 1X sampling
+#        cf.devx.ctrl_transfer(0x40, 0x24, 0x0, 0, 0, 0, 100) # set to addr DAC A 
+#        cf.devx.ctrl_transfer(0x40, 0x25, 0x1, 0, 0, 0, 100) # set to addr DAC B
+#    elif cf.AWG_2X == 1: # configure board for single AWG channel A at 2X sampling
+#        cf.devx.ctrl_transfer(0x40, 0x24, 0x0, 0, 0, 0, 100) # set to addr DAC A 
+#        cf.devx.ctrl_transfer(0x40, 0x25, 0x0, 0, 0, 0, 100) # set t0 addr DAC A
+#        cf.devx.ctrl_transfer(0x40, 0x51, 40, 0, 0, 0, 100) # set IN3 switch to open
+#        cf.devx.ctrl_transfer(0x40, 0x51, 52, 0, 0, 0, 100) # set IN3 switch to open
+#    elif cf.AWG_2X == 2: # configure board for single AWG channel B at 2X sampling
+#        cf.devx.ctrl_transfer(0x40, 0x24, 0x1, 0, 0, 0, 100) # set to addr DAC B 
+#        cf.devx.ctrl_transfer(0x40, 0x25, 0x1, 0, 0, 0, 100) # set to addr DAC B
+#        cf.devx.ctrl_transfer(0x40, 0x51, 35, 0, 0, 0, 100) # set IN3 switch to open
+#        cf.devx.ctrl_transfer(0x40, 0x51, 51, 0, 0, 0, 100) # set IN3 switch to open
         
 # Function to left (-num) or right (+num) shift buffer and fill with a value
 # returns same length buffer

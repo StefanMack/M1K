@@ -29,11 +29,10 @@ def MakeTimeTrace():
     global TMAVline, TMBVline, TMCVline, TMDVline
     global Tmathline, TMXline, TMYline
     global MathAxis
-    global Triggerline, Triggersymbol, TgEdge, hldn
+    global Triggerline, Triggersymbol, hldn
     global MouseCAV, MouseCAI, MouseCBV, MouseCBI    
     global SCstart, DISsamples
     global TRACEsize
-    global TRIGGERlevel, TRIGGERentry, AutoLevel
     global CurOffA, CurOffB, CurGainA, CurGainB
     global HozPoss
 
@@ -543,18 +542,18 @@ def MakeTimeTrace():
     if cf.TgInput.get() > 0:
         if cf.TgInput.get() == 1 : # triggering on CA-V
             x1 = cf.X0L
-            ytemp = Yconv1 * (float(TRIGGERlevel)-CHAVOffset) 
+            ytemp = Yconv1 * (float(cf.TRIGGERlevel)-CHAVOffset) 
             y1 = int(c1 - ytemp)
         elif cf.TgInput.get() == 2:  # triggering on CA-I
             x1 = cf.X0L+cf.GRW
-            y1 = int(c1 - YIconv1 * (float(TRIGGERlevel) - CHAIOffset))
+            y1 = int(c1 - YIconv1 * (float(cf.TRIGGERlevel) - CHAIOffset))
         elif cf.TgInput.get() == 3:  # triggering on CB-V
             x1 = cf.X0L
-            ytemp = Yconv2 * (float(TRIGGERlevel)-CHBVOffset)          
+            ytemp = Yconv2 * (float(cf.TRIGGERlevel)-CHBVOffset)          
             y1 = int(c2 - ytemp)
         elif cf.TgInput.get() == 4: # triggering on CB-I
             x1 = cf.X0L+cf.GRW
-            y1 = int(c2 - YIconv2 * (float(TRIGGERlevel) - CHBIOffset))
+            y1 = int(c2 - YIconv2 * (float(cf.TRIGGERlevel) - CHBIOffset))
             
         if (y1 < Ymin):
             y1 = Ymin
@@ -569,7 +568,7 @@ def MakeTimeTrace():
         Triggerline.append(int(x1-5))
         Triggerline.append(int(y1+5))
         x1 = cf.X0L + (cf.GRW/2)
-        if TgEdge.get() == 0: # draw rising edge symbol
+        if cf.TgEdge.get() == 0: # draw rising edge symbol
             y1 = -3
             y2 = -13
         else:
@@ -591,19 +590,14 @@ def MakeTimeScreen():
     global Ymin, Ymax
     global MouseCAV, MouseCAI, MouseCBV, MouseCBI
     global ShowXCur, ShowYCur
-    global ShowMath
-    global SingleShot        
+    global ShowMath       
     global DISsamples      # current spin box value
     global HtMulEntry
-    global TRIGGERlevel
-    global COLORtrigger
     global TRACErefresh, TRACEmode
-    global Is_Triggered
     global DCV1, DCV2, CHAHW, CHALW, CHADCy, CHAperiod, CHAfreq
     global DCI1, DCI2, CHBHW, CHBLW, CHBDCy, CHBperiod, CHBfreq
     global CurOffA, CurOffB, CurGainA, CurGainB
-    global CHABphase
-    global AWGAShape, AWGBShape 
+    global CHABphase 
     global HozPoss
     
     COLORgrid = "#808080"     # 50% Gray
@@ -790,8 +784,8 @@ def MakeTimeScreen():
         i = i + 1
     # Write the trigger line if available
     if len(Triggerline) > 2:                    # Avoid writing lines with 1 coordinate
-        cf.ca.create_polygon(Triggerline, outline=COLORtrigger, fill=COLORtrigger, width=1)
-        cf.ca.create_line(Triggersymbol, fill=COLORtrigger, width=cf.GridWidth.get())
+        cf.ca.create_polygon(Triggerline, outline=cf.COLORtrigger, fill=cf.COLORtrigger, width=1)
+        cf.ca.create_line(Triggersymbol, fill=cf.COLORtrigger, width=cf.GridWidth.get())
         if cf.TgInput.get() == 1:
             TgLabel = "CA-V"
         if cf.TgInput.get() == 2:
@@ -800,14 +794,14 @@ def MakeTimeScreen():
             TgLabel = "CB-V"
         if cf.TgInput.get() == 4:
             TgLabel = "CB-I"
-        if Is_Triggered == 1:
+        if cf.Is_Triggered == 1:
             TgLabel = TgLabel + " Triggered"
         else:
             TgLabel = TgLabel + " Not Triggered"
-            if SingleShot.get() > 0:
+            if cf.SingleShot.get() > 0:
                 TgLabel = TgLabel + " Armed"
         x = cf.X0L + (cf.GRW/2) + 12
-        cf.ca.create_text(x, Ymin-cf.FontSize, text=TgLabel, fill=COLORtrigger, anchor="w", font=("arial", cf.FontSize ))
+        cf.ca.create_text(x, Ymin-cf.FontSize, text=TgLabel, fill=cf.COLORtrigger, anchor="w", font=("arial", cf.FontSize ))
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Setzen der Zeit-/Signalcursor bei Rechtsklick auf Oszibild
@@ -878,6 +872,7 @@ def MakeTimeScreen():
 
     # General information on top of the grid
     # Sweep information
+    txt = ""
     if cf.TRACEmodeTime.get() == 1:
         txt = "Averaging "
     if cf.ManualTrigger.get() == 1:
@@ -974,7 +969,7 @@ def MakeTimeScreen():
         if cf.MeasDCI1.get() == 1:
             V1String = '{0:.2f} '.format(DCI1)
             txt = txt + " AvgI=" + V1String
-            if AWGAShape.get() == 0: # if this is a DC measurement calc resistance
+            if cf.AWGAShape.get() == 0: # if this is a DC measurement calc resistance
                 try:
                     Resvalue = (DCV1/DCI1)*1000
                     txt = txt + " Res = " + '{0:.1f} '.format(Resvalue)
@@ -1019,7 +1014,7 @@ def MakeTimeScreen():
         if cf.MeasDCI2.get() == 1:
             V1String = '{0:.2f} '.format(cf.DCI2)
             txt = txt + " AvgI=" + V1String
-            if AWGBShape.get() == 0: # if this is a DC measurement calc resistance
+            if cf.AWGBShape.get() == 0: # if this is a DC measurement calc resistance
                 try:
                     Resvalue = (cf.DCV2/cf.DCI2)*1000
                     R1String = ' {0:.1f} '.format(Resvalue)

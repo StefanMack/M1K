@@ -7,14 +7,68 @@ S. Mack, 29.8.20
 
 import tkinter as tk
 import tkinter.ttk as ttk # nötig für Widget Styles
+import tkinter.messagebox as tkm
 import platform
 import aliceM1kSamp as m1k
 #from aliceM1kSamp import SetSampleRate, SetADC_Mux
-from aliceAwgFunc import ReMakeAWGwaves, UpdateAwgCont, UpdateAwgContRet
-from aliceAwgFunc import BAWGAModeLabel, UpdateAWGA
-from aliceAwgFunc import  BAWGBModeLabel,UpdateAWGB
+from aliceAwgFunc import ReMakeAWGwaves, UpdateAwgCont
+from aliceAwgFunc import UpdateAWGA
+from aliceAwgFunc import UpdateAWGB
 from aliceOsciFunc import UpdateTimeTrace
 import config as cf
+
+## Tool Tip Ballon help stuff
+class CreateToolTip(object):
+    ## create a tooltip for a given widget
+    def __init__(self, widget, text='widget info'):
+        self.waittime = 500     #miliseconds
+        self.wraplength = 100   #pixels
+        self.widget = widget
+        self.text = text
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+        self.widget.bind("<ButtonPress>", self.leave)
+        self.id = None
+        self.tw = None
+    ## Action when mouse enters
+    def enter(self, event=None):
+        self.schedule()
+    ## Action when mouse leaves
+    def leave(self, event=None):
+        self.unschedule()
+        self.hidetip()
+    ## Sehedule Action
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(self.waittime, self.showtip)
+    ## Un-schedule Action
+    def unschedule(self):
+        id = self.id
+        self.id = None
+        if id:
+            self.widget.after_cancel(id)
+    ## Display Tip Text
+    def showtip(self, event=None):
+        x = y = 0
+        x, y, cx, cy = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 20
+        # creates a toplevel window
+        self.tw = tk.Toplevel(self.widget)
+        # Leaves only the label and removes the app window
+        self.tw.wm_overrideredirect(True)
+        self.tw.wm_geometry("+%d+%d" % (x, y))
+        label = ttk.Label(self.tw, text=self.text, justify='left',
+                       background="#ffffe0", relief='solid', borderwidth=1,
+                       wraplength = self.wraplength)
+        label.pack(ipadx=1)
+    ## Hide Tip Action
+    def hidetip(self):
+        tw = self.tw
+        self.tw= None
+        if tw:
+            tw.destroy()
+
 
 #---Messfunktionen Berechnungsformeln:
 ChaMeasString1 = "DCV1"
@@ -46,8 +100,8 @@ ChbLableSrring6 = "CHB-ACRMS "
 MathScreenStatus = tk.IntVar(0)
 SampleRateStatus = tk.IntVar(0)
 
-def donothing():
-    pass
+SampleRatewindow = None
+
 
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -114,208 +168,163 @@ def onSrateScroll(event):
 def onRetSrate(event):
     m1k.SetSampleRate()
     
-def onTextKeyAWG(event):
-    onTextKey(event)
-    ReMakeAWGwaves()
+#def onTextKeyAWG(event): # Udate nur bei Return
+#    onTextKey(event)
+#    ReMakeAWGwaves()
+
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Tkinter UI Menüs aufbauen
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #--- AWG Menü im Hauptfenster
 def MakeAWGMenuInside():
-    global AWGATerm, AWGAShap, awgwindow
-    global AWGBTerm, AWGBShape, AWGARepeatFlag, AWGBRepeatFlag
-    global AWGAShapeLabel, AWGBShapeLabel, AWGShowAdvanced
-    global AWGADutyCycleEntry
-    global AWGBDutyCycleEntry
-    global AWGALength, AWGBLength, phasealab, phaseblab, AWGAModeLabel, AWGBModeLabel
-    global duty1lab, duty2lab, awgaph, awgadel, awgbph, awgbdel
-    global AwgLayout
-    global amp1lab, amp2lab, off1lab, off2lab, donothing, onTextKeyAWG 
+    global amp1lab, amp2lab, off1lab, off2lab
     # now AWG A
-    AWGATerm = tk.IntVar(0)   # AWG A termination variable
-    AWGAShape = tk.IntVar(0)  # AWG A Wave shape variable
-    AWGARepeatFlag = tk.IntVar(0) # AWG A Arb shape repeat flag
+
     ModeAMenu = ttk.Menubutton(cf.AWGAMenus, text="Mode", style="W5.TButton")
     ModeAMenu.menu = tk.Menu(ModeAMenu, tearoff = 0 )
     ModeAMenu["menu"] = ModeAMenu.menu
-    ModeAMenu.menu.add_command(label="-Mode-", foreground="blue", command=donothing)
-    ModeAMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGAMode, value=0, command=BAWGAModeLabel)
-    ModeAMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGAMode, value=1, command=BAWGAModeLabel)
-    ModeAMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGAMode, value=2, command=BAWGAModeLabel)
-    ModeAMenu.menu.add_separator()
-    ModeAMenu.menu.add_command(label="-Term-", foreground="blue", command=donothing)
-    ModeAMenu.menu.add_radiobutton(label="Open", variable=AWGATerm, value=0, command=UpdateAwgCont)
-    ModeAMenu.menu.add_radiobutton(label="To GND", variable=AWGATerm, value=1, command=UpdateAwgCont)
-    ModeAMenu.menu.add_radiobutton(label="To 2.5V", variable=AWGATerm, value=2, command=UpdateAwgCont)
+    ModeAMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGAMode, value=0, command=ReMakeAWGwaves)
+    ModeAMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGAMode, value=1, command=ReMakeAWGwaves)
+    ModeAMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGAMode, value=2, command=ReMakeAWGwaves)
     ModeAMenu.pack(side=tk.LEFT, anchor=tk.W)
     ShapeAMenu = ttk.Menubutton(cf.AWGAMenus, text="Shape", style="W6.TButton")
     ShapeAMenu.menu = tk.Menu(ShapeAMenu, tearoff = 0 )
     ShapeAMenu["menu"] = ShapeAMenu.menu
-    ShapeAMenu.menu.add_radiobutton(label="DC", variable=AWGAShape, value=0, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Sine", variable=AWGAShape, value=18, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Triangle", variable=AWGAShape, value=2, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Sawtooth", variable=AWGAShape, value=3, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Square", variable=AWGAShape, value=4, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="StairStep", variable=AWGAShape, value=5, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Impulse", variable=AWGAShape, value=9, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Trapezoid", variable=AWGAShape, value=11, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Pulse", variable=AWGAShape, value=20, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="Ramp", variable=AWGAShape, value=16, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="SSQ Pulse", variable=AWGAShape, value=15, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="U-D Ramp", variable=AWGAShape, value=12, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="UU Noise", variable=AWGAShape, value=7, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_radiobutton(label="UG Noise", variable=AWGAShape, value=8, command=ReMakeAWGwaves)
-    ShapeAMenu.menu.add_separator()
-    ShapeAMenu.menu.add_checkbutton(label='Repeat', variable=AWGARepeatFlag)
+    ShapeAMenu.menu.add_radiobutton(label="DC", variable=cf.AWGAShape, value=0, command=ReMakeAWGwaves)
+    ShapeAMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGAShape, value=1, command=ReMakeAWGwaves)
+    ShapeAMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGAShape, value=2, command=ReMakeAWGwaves)
+    ShapeAMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGAShape, value=3, command=ReMakeAWGwaves)
+    ShapeAMenu.menu.add_radiobutton(label="Square", variable=cf.AWGAShape, value=4, command=ReMakeAWGwaves)
+    ShapeAMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGAShape, value=5, command=ReMakeAWGwaves)
     ShapeAMenu.pack(side=tk.LEFT, anchor=tk.W)
 
+    # AWGA: Einstellung Min-/Maxwerte
     awg1ampl = ttk.Frame(cf.AWGASet)
     awg1ampl.pack(side=tk.TOP)
     cf.AWGAMinEntry = tk.Entry(awg1ampl, width=5)
-    cf.AWGAMinEntry.bind("<Return>", UpdateAwgContRet)
-
-    cf.AWGAMinEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGAMinEntry.bind("<Return>", UpdateAwgCont) # Update nur bei Return
+    #cf.AWGAMinEntry.bind('<Key>', onTextKeyAWG)
     cf.AWGAMinEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGAMinEntry.delete(0,tk.END)
     cf.AWGAMinEntry.insert(0,0.0)
-    amp1lab = ttk.Label(awg1ampl) #, text="Min Ch A")
+    amp1lab = ttk.Label(awg1ampl, text = "Min (V)" ) 
     amp1lab.pack(side=tk.LEFT, anchor=tk.W)
-    #
     awg1off = ttk.Frame(cf.AWGASet)
     awg1off.pack(side=tk.TOP)
     cf.AWGAMaxEntry = tk.Entry(awg1off, width=5)
-    cf.AWGAMaxEntry.bind("<Return>", UpdateAwgContRet)
-    cf.AWGAMaxEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGAMaxEntry.bind("<Return>", UpdateAwgCont)
+    #cf.AWGAMaxEntry.bind('<Key>', onTextKeyAWG)
     cf.AWGAMaxEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGAMaxEntry.delete(0,tk.END)
     cf.AWGAMaxEntry.insert(0,0.0)
-    off1lab = ttk.Label(awg1off) #, text="Max Ch A")
+    off1lab = ttk.Label(awg1off, text = "Max (V)")
     off1lab.pack(side=tk.LEFT, anchor=tk.W)
-    amp1lab.config(text = "Min Ch A" ) # Kann noch vereinfacht werden
-    off1lab.config(text = "Max Ch A" )
-
-    # AWG Frequency sub frame
+    # AWGA: Einstellung Frequenz
     awg1freq = ttk.Frame(cf.AWGASet)
     awg1freq.pack(side=tk.TOP)
     cf.AWGAFreqEntry = tk.Entry(awg1freq, width=7)
-    cf.AWGAFreqEntry.bind("<Return>", UpdateAwgContRet)
-    cf.AWGAFreqEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGAFreqEntry.bind("<Return>", UpdateAwgCont)
+    #cf.AWGAFreqEntry.bind('<Key>', onTextKeyAWG)
     cf.AWGAFreqEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGAFreqEntry.delete(0,tk.END)
     cf.AWGAFreqEntry.insert(0,100.0)
-    freq1lab = ttk.Label(awg1freq, text="Freq Ch A")
-    freq1lab.pack(side=tk.LEFT, anchor=tk.W)
-    # AWG duty cycle frame
+    freq1lab = ttk.Label(awg1freq, text="Freq (Hz)")
+    freq1lab.pack(side=tk.LEFT, anchor=tk.W)   
+    # AWGA: Einstellung Duty Cycle für Rechtecksignal
     awg1dc = ttk.Frame(cf.AWGASet)
     awg1dc.pack(side=tk.TOP)
-    AWGADutyCycleEntry = tk.Entry(awg1dc, width=5)
-    AWGADutyCycleEntry.bind("<Return>", UpdateAwgContRet)
-    AWGADutyCycleEntry.bind('<Key>', onTextKeyAWG)
-    AWGADutyCycleEntry.pack(side=tk.LEFT, anchor=tk.W)
-    AWGADutyCycleEntry.delete(0,tk.END)
-    AWGADutyCycleEntry.insert(0,50)
-    duty1lab = ttk.Label(awg1dc, text="Duty Cycle %")
+    cf.AWGADutyCycleEntry = tk.Entry(awg1dc, width=5)
+    cf.AWGADutyCycleEntry.bind("<Return>", UpdateAwgCont)
+    #cf.AWGADutyCycleEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGADutyCycleEntry.pack(side=tk.LEFT, anchor=tk.W)
+    cf.AWGADutyCycleEntry.delete(0,tk.END)
+    cf.AWGADutyCycleEntry.insert(0,50)
+    duty1lab = ttk.Label(awg1dc, text="Duty Cycle (%)")
     duty1lab.pack(side=tk.LEFT, anchor=tk.W)
 
     # now AWG B
-    AWGBTerm = tk.IntVar(0)   # AWG B termination variable
-    AWGBShape = tk.IntVar(0)  # AWG B Wave shape variable
-    AWGBRepeatFlag = tk.IntVar(0) # AWG B Arb shape repeat flag
     ModeBMenu = ttk.Menubutton(cf.AWGBMenus, text="Mode", style="W5.TButton")
     ModeBMenu.menu = tk.Menu(ModeBMenu, tearoff = 0 )
     ModeBMenu["menu"] = ModeBMenu.menu
-    ModeBMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGBMode, value=0, command=BAWGBModeLabel)
-    ModeBMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGBMode, value=1, command=BAWGBModeLabel)
-    ModeBMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGBMode, value=2, command=BAWGBModeLabel)
-    ModeBMenu.menu.add_separator()
-    ModeBMenu.menu.add_radiobutton(label="Open", variable=AWGBTerm, value=0, command=UpdateAwgCont)
-    ModeBMenu.menu.add_radiobutton(label="To GND", variable=AWGBTerm, value=1, command=UpdateAwgCont)
-    ModeBMenu.menu.add_radiobutton(label="To 2.5V", variable=AWGBTerm, value=2, command=UpdateAwgCont)
+    ModeBMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGBMode, value=0, command=ReMakeAWGwaves)
+    ModeBMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGBMode, value=1, command=ReMakeAWGwaves)
+    ModeBMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGBMode, value=2, command=ReMakeAWGwaves)
     ModeBMenu.pack(side=tk.LEFT, anchor=tk.W)
     ShapeBMenu = ttk.Menubutton(cf.AWGBMenus, text="Shape", style="W6.TButton")
     ShapeBMenu.menu = tk.Menu(ShapeBMenu, tearoff = 0 )
     ShapeBMenu["menu"] = ShapeBMenu.menu
-    ShapeBMenu.menu.add_radiobutton(label="DC", variable=AWGBShape, value=0, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Sine", variable=AWGBShape, value=18, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Triangle", variable=AWGBShape, value=2, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Sawtooth", variable=AWGBShape, value=3, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Square", variable=AWGBShape, value=4, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="StairStep", variable=AWGBShape, value=5, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Impulse", variable=AWGBShape, value=9, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Trapezoid", variable=AWGBShape, value=11, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Pulse", variable=AWGBShape, value=20, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="Ramp", variable=AWGBShape, value=16, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="SSQ Pulse", variable=AWGBShape, value=15, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="U-D Ramp", variable=AWGBShape, value=12, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="UU Noise", variable=AWGBShape, value=7, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_radiobutton(label="UG Noise", variable=AWGBShape, value=8, command=ReMakeAWGwaves)
-    ShapeBMenu.menu.add_separator()
-    ShapeBMenu.menu.add_checkbutton(label='Repeat', variable=AWGBRepeatFlag)
+    ShapeBMenu.menu.add_radiobutton(label="DC", variable=cf.AWGBShape, value=0, command=ReMakeAWGwaves)
+    ShapeBMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGBShape, value=1, command=ReMakeAWGwaves)
+    ShapeBMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGBShape, value=2, command=ReMakeAWGwaves)
+    ShapeBMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGBShape, value=3, command=ReMakeAWGwaves)
+    ShapeBMenu.menu.add_radiobutton(label="Square", variable=cf.AWGBShape, value=4, command=ReMakeAWGwaves)
+    ShapeBMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGBShape, value=5, command=ReMakeAWGwaves)
     ShapeBMenu.pack(side=tk.LEFT, anchor=tk.W)
 
+    # AWGB: Einstellung Min-/Maxwerte
     awg2ampl = ttk.Frame(cf.AWGBSet)
     awg2ampl.pack(side=tk.TOP)
     cf.AWGBMinEntry = tk.Entry(awg2ampl, width=5)
-    cf.AWGBMinEntry.bind("<Return>", UpdateAwgContRet)
-    cf.AWGBMinEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGBMinEntry.bind("<Return>", UpdateAwgCont)
+    #cf.AWGBMinEntry.bind('<Key>', onTextKeyAWG)
     cf.AWGBMinEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGBMinEntry.delete(0,tk.END)
     cf.AWGBMinEntry.insert(0,0.0)
-    amp2lab = ttk.Label(awg2ampl) #, text="Min Ch B")
+    amp2lab = ttk.Label(awg2ampl, text = "Min (V)")
     amp2lab.pack(side=tk.LEFT, anchor=tk.W)
-    #
     awg2off = ttk.Frame(cf.AWGBSet)
     awg2off.pack(side=tk.TOP)
     cf.AWGBMaxEntry = tk.Entry(awg2off, width=5)
-    cf.AWGBMaxEntry.bind("<Return>", UpdateAwgContRet)
-    cf.AWGBMaxEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGBMaxEntry.bind("<Return>", UpdateAwgCont)
+    #cf.AWGBMaxEntry.bind('<Key>', onTextKeyAWG)
     cf.AWGBMaxEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGBMaxEntry.delete(0,tk.END)
     cf.AWGBMaxEntry.insert(0,0.0)
-    off2lab = ttk.Label(awg2off) #, text="Max Ch B")
+    off2lab = ttk.Label(awg2off, text = "Max (V)")
     off2lab.pack(side=tk.LEFT, anchor=tk.W)
-    amp2lab.config(text = "Min Ch B" )
-    off2lab.config(text = "Max Ch B" )
-
-    # AWG Frequency sub frame
+    # AWGB: Einstellung Frequenz
     awg2freq = ttk.Frame(cf.AWGBSet)
     awg2freq.pack(side=tk.TOP)
     cf.AWGBFreqEntry = tk.Entry(awg2freq, width=7)
-    cf.AWGBFreqEntry.bind("<Return>", UpdateAwgContRet)
-    cf.AWGBFreqEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGBFreqEntry.bind("<Return>", UpdateAwgCont)
+    #cf.AWGBFreqEntry.bind('<Key>', onTextKeyAWG)
     cf.AWGBFreqEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGBFreqEntry.delete(0,tk.END)
     cf.AWGBFreqEntry.insert(0,100.0)
-    freq2lab = ttk.Label(awg2freq, text="Freq Ch B")
-    freq2lab.pack(side=tk.LEFT, anchor=tk.W)
-    # AWG duty cycle frame
+    freq2lab = ttk.Label(awg2freq, text="Freq (Hz)")
+    freq2lab.pack(side=tk.LEFT, anchor=tk.W)    
+    # AWGB: Einstellung Duty Cycle für Rechtecksignal
     awg2dc = ttk.Frame(cf.AWGBSet)
     awg2dc.pack(side=tk.TOP)
-    AWGBDutyCycleEntry = tk.Entry(awg2dc, width=5)
-    AWGBDutyCycleEntry.bind("<Return>", UpdateAwgContRet)
-    AWGBDutyCycleEntry.bind('<Key>', onTextKeyAWG)
-    AWGBDutyCycleEntry.pack(side=tk.LEFT, anchor=tk.W)
-    AWGBDutyCycleEntry.delete(0,tk.END)
-    AWGBDutyCycleEntry.insert(0,50)
-    duty2lab = ttk.Label(awg2dc, text="Duty Cycle %")
+    cf.AWGBDutyCycleEntry = tk.Entry(awg2dc, width=5)
+    cf.AWGBDutyCycleEntry.bind("<Return>", UpdateAwgCont)
+    #cf.AWGBDutyCycleEntry.bind('<Key>', onTextKeyAWG)
+    cf.AWGBDutyCycleEntry.pack(side=tk.LEFT, anchor=tk.W)
+    cf.AWGBDutyCycleEntry.delete(0,tk.END)
+    cf.AWGBDutyCycleEntry.insert(0,50)
+    duty2lab = ttk.Label(awg2dc, text="Duty Cycle (%)")
     duty2lab.pack(side=tk.LEFT, anchor=tk.W)
+    awg2hint = ttk.Label(cf.AWGBSet, text=" at numeric inputs \n press <Return> to confirm" )
+    awg2hint.pack(side=tk.TOP, pady = (10,0))
+    
+    # Tooltips für die AWGs
+    CreateToolTip(ModeAMenu, 'Hier die Fuktion des Kanals einstellen: Nur Sampeln (Hi-Z), AWG als Spannungsquelle (SVMI) oder Stromquelle (SIMV)')
+
 
 def UpdateAWGMenu():
     UpdateAWGA()
     UpdateAWGB()
     ReMakeAWGwaves()
+    
 
-def DestroyAWGMenu():
-    global awgwindow   
-    awgwindow.iconify()
+
 #--- Ende AWG Menü im Hauptfenster
     
 #--- Samplingrate Menü im Unterfenster
 def MakeSampleRateMenu():
     global SampleRatewindow, SampleRateStatus, BaseRatesb
-    global Alternate_Sweep_Mode
-    if SampleRateStatus.get() == 0:
+    if (SampleRateStatus.get() == 0 and cf.DevID != "No Device"):
         SampleRateStatus.set(1)
         SampleRatewindow = tk.Toplevel()
         SampleRatewindow.title("Set Sample Rate ")
@@ -337,12 +346,12 @@ def MakeSampleRateMenu():
         BaseRatesb.delete(0,tk.END)
         BaseRatesb.insert(0,cf.BaseSampleRate)
        
-        twoX = ttk.Checkbutton(frame1, text="Double Sample Rate", variable=cf.Two_X_Sample, command=m1k.SetADC_Mux )
+        twoX = ttk.Checkbutton(frame1, text="2x Sample Rate", variable=cf.Two_X_Sample, command=m1k.SetADC_Mux)
         twoX.grid(row=1, column=0, sticky=tk.W)
 
         ## Mux Modus 0 ist nötig für VA und VB mit 200.000 S/s
         ## Hier wird der ADC_Mux_Mode eingestellt, je nachdem welche Knöpfe (VA, VB, IA, IB) vom Benutzer aktiviert sind.
-        muxlab1 = ttk.Label(frame1, text="ADC MUX Modes", style="A10B.TLabel") #, font = "Arial 10 bold")
+        muxlab1 = ttk.Label(frame1, text="Chose CHs for 2x", style="A10B.TLabel") #, font = "Arial 10 bold")
         muxlab1.grid(row=2, column=0, sticky=tk.W)
         chabuttons = ttk.Frame(frame1)
         chabuttons.grid(row=3, column=0, sticky=tk.W)
@@ -363,8 +372,11 @@ def MakeSampleRateMenu():
         muxrb4 = ttk.Radiobutton(chbbuttons, text="VB and IA", variable=cf.ADC_Mux_Mode, value=3, command=m1k.SetADC_Mux ) # style="W8.TButton",
         muxrb4.pack(side=tk.LEFT)
         
-        sratedismissclbutton = ttk.Button(frame1, text="Activate", style="W8.TButton", command=DestroySampleRateMenu)
+        sratedismissclbutton = ttk.Button(frame1, text="Close Window", style="W12.TButton", command=DestroySampleRateMenu)
         sratedismissclbutton.grid(row=6, column=0, sticky=tk.W, pady=7)
+    else:
+        tkm.showwarning("WARNING","No Device Plugged In!")
+        return 
 
 def DestroySampleRateMenu():
     global SampleRatewindow, SampleRateStatus   
@@ -374,10 +386,8 @@ def DestroySampleRateMenu():
 
 #--- Settings Menü im Unterfenster
 def MakeSettingsMenu():
-    global Vdiv
-    global Settingswindow, ZSTuff, TAvg, VDivE, TwdthE, GwdthE
+    global Settingswindow, TAvg, TwdthE, GwdthE
     global TrgLPFEntry
-    global cha_A1Entry, cha_A2Entry, chb_A1Entry, chb_A2Entry
     if cf.SettingsStatus.get() == 0:
         cf.SettingsStatus.set(1)
         Settingswindow = tk.Toplevel()
@@ -431,14 +441,12 @@ def MakeSettingsMenu():
         TrgLPFEntry.delete(0,tk.END)
         TrgLPFEntry.insert(0,cf.Trigger_LPF_length.get())
        
-        Settingsdismissbutton = ttk.Button(frame1, text="Activate", style= "W8.TButton", command=DestroySettingsMenu)
+        Settingsdismissbutton = ttk.Button(frame1, text="Close Window", style= "W12.TButton", command=DestroySettingsMenu)
         Settingsdismissbutton.grid(row=12, column=0, sticky=tk.W, pady=7)
     
 def UpdateSettingsMenu():
-    global Vdiv
-    global Settingswindow, ZSTuff, TAvg, VDivE, TwdthE, GwdthE
+    global Settingswindow, TAvg, TwdthE, GwdthE
     global TrgLPFEntry
-    global cha_A1Entry, cha_A2Entry, chb_A1Entry, chb_A2Entry
     
     try:
         GW = int(eval(GwdthE.get()))
@@ -510,8 +518,6 @@ def DestroySettingsMenu():
 #--- Menü mit Mathematikfunktionen
 def MakeMathMenu():
     global MathScreenStatus, MathWindow
-    global formentry, unitsentry, axisentry, xformentry, xunitsentry, xaxisentry, yformentry, yunitsentry, yaxisentry
-    global formlab, xformlab, yformlab
     
     if MathScreenStatus.get() == 0:
         MathScreenStatus.set(1)
@@ -519,10 +525,10 @@ def MakeMathMenu():
         MathWindow.title("Math Formula ")
         MathWindow.resizable(False,False)
         MathWindow.protocol("WM_DELETE_WINDOW", DestroyMathMenu)
-        frame1 = ttk.LabelFrame(MathWindow, text="Built-in Exp", style="A10R1.TLabelframe")
-        frame2 = ttk.LabelFrame(MathWindow, text="Math Trace", style="A10R1.TLabelframe")
+        frame1 = ttk.LabelFrame(MathWindow, text="Math Trace", style="A10R1.TLabelframe")
+        #frame2 = ttk.LabelFrame(MathWindow, text="Math Trace", style="A10R1.TLabelframe")
         frame1.grid(row = 0, column=0, rowspan=3, sticky=tk.W)
-        frame2.grid(row = 0, column=1, sticky=tk.W)
+        #frame2.grid(row = 0, column=1, sticky=tk.W)
 
         # Built in functions
         rb1 = ttk.Radiobutton(frame1, text='none', variable=cf.MathTrace, value=0, command=UpdateTimeTrace)
@@ -549,7 +555,7 @@ def MakeMathMenu():
         rb11.grid(row=10, column=0, sticky=tk.W)
         rb12 = ttk.Radiobutton(frame1, text='CBI/CAI', variable=cf.MathTrace, value=11, command=UpdateTimeTrace)
         rb12.grid(row=11, column=0, sticky=tk.W)     
-        dismissbutton = ttk.Button(MathWindow, text="Activate", command=DestroyMathMenu)
+        dismissbutton = ttk.Button(MathWindow, text="Close Window", command=DestroyMathMenu)
         dismissbutton.grid(row=3, column=0, sticky=tk.W)      
     if cf.RUNstatus.get() > 0:
         UpdateTimeTrace()
@@ -563,58 +569,4 @@ def DestroyMathMenu():
 #--- Ende Menü mit Mathematikfunktionen
 
 
-       
-## Tool Tip Ballon help stuff
-class CreateToolTip(object):
-    ## create a tooltip for a given widget
-    def __init__(self, widget, text='widget info'):
-        self.waittime = 500     #miliseconds
-        self.wraplength = 100   #pixels
-        self.widget = widget
-        self.text = text
-        self.widget.bind("<Enter>", self.enter)
-        self.widget.bind("<Leave>", self.leave)
-        self.widget.bind("<ButtonPress>", self.leave)
-        self.id = None
-        self.tw = None
-    ## Action when mouse enters
-    def enter(self, event=None):
-        self.schedule()
-    ## Action when mouse leaves
-    def leave(self, event=None):
-        self.unschedule()
-        self.hidetip()
-    ## Sehedule Action
-    def schedule(self):
-        self.unschedule()
-        self.id = self.widget.after(self.waittime, self.showtip)
-    ## Un-schedule Action
-    def unschedule(self):
-        id = self.id
-        self.id = None
-        if id:
-            self.widget.after_cancel(id)
-    ## Display Tip Text
-    def showtip(self, event=None):
-        x = y = 0
-        x, y, cx, cy = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 20
-        # creates a toplevel window
-        self.tw = tk.Toplevel(self.widget)
-        # Leaves only the label and removes the app window
-        self.tw.wm_overrideredirect(True)
-        self.tw.wm_geometry("+%d+%d" % (x, y))
-        label = ttk.Label(self.tw, text=self.text, justify='left',
-                       background="#ffffe0", relief='solid', borderwidth=1,
-                       wraplength = self.wraplength)
-        label.pack(ipadx=1)
-    ## Hide Tip Action
-    def hidetip(self):
-        tw = self.tw
-        self.tw= None
-        if tw:
-            tw.destroy()
-            
-
-          
+    

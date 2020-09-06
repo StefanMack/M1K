@@ -9,7 +9,7 @@ import time
 import numpy as np
 import tkinter as tk
 import tkinter.messagebox as tkm
-#import pysmu as smu
+import pysmu as smu
 from aliceTimeFunc import MakeTimeTrace, MakeTimeScreen
 from aliceAwgFunc import BAWGEnab
 import aliceM1kSamp as m1k
@@ -23,14 +23,13 @@ PowerStatus = 1 # 0 stopped, 1 start, 2 running, 3 stop and restart, 4 stop
     
 ## Stop (pause) scope tool
 def BStop():
-    global CHA, CHB 
     if (cf.RUNstatus.get() == 1):
         # print("Stoping")
         cf.RUNstatus.set(0)
-        CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
-        CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode
-        CHA.constant(0.0)
-        CHB.constant(0.0)
+        cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
+        cf.CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode
+        cf.CHA.constant(0.0)
+        cf.CHB.constant(0.0)
         if cf.session.continuous:
             cf.session.end()
 
@@ -144,14 +143,12 @@ def BStart():
         if (cf.RUNstatus.get() == 0):
             cf.RUNstatus.set(1)
             cf.session.flush()
-            CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z mode
-            CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z mode
+            cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z mode
+            cf.CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z mode
             BAWGEnab()
             if not cf.session.continuous:
                 cf.session.start(0)
-            time.sleep(0.02) # wait awhile here for some reason
-
-                    
+            time.sleep(0.02) # wait awhile here for some reason                   
     # UpdateTimeScreen()          # Always Update
     if cf.TIMEdiv >= 100:
         First_Slow_sweep = 0
@@ -173,7 +170,7 @@ def UpdateTimeTrace():
 def UpdateTimeScreen():
     MakeTimeScreen() # Update the screen
     cf.MarkerNum = 0 # Marker wurden durch MakeTimeScreen() gelöscht, jetzt noch Position 1. Marker wieder zurücksetzen 
-    cf.root.update()       # Activate updated screens    
+    cf.root.update() # Activate updated screens    
 
         
 
@@ -182,8 +179,6 @@ def UpdateTimeScreen():
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #--- Set Trigger level to 50% (mid) point of current waveform
 def BTrigger50p():
-    global TRIGGERlevel, TRIGGERentry
-
     # set new trigger level to mid point of waveform    
     MidV1 = (cf.MaxV1+cf.MinV1)/2
     MidV2 = (cf.MaxV2+cf.MinV2)/2
@@ -199,20 +194,19 @@ def BTrigger50p():
         DCString = ' {0:.2f} '.format(MidV2)
     elif (cf.TgInput.get() == 4 ):
         DCString = ' {0:.2f} '.format(MidI2)
-    TRIGGERlevel = eval(DCString)
-    TRIGGERentry.delete(0,tk.END)
-    TRIGGERentry.insert(4, DCString)    
+    cf.TRIGGERlevel = eval(DCString)
+    cf.TRIGGERentry.delete(0,tk.END)
+    cf.TRIGGERentry.insert(4, DCString)    
     UpdateTimeTrace()           # Always Update
    
 #---Auf Eingabe neue Triggerschwelle reagieren
 def BTriglevel(event):
-    global TRIGGERlevel, TRIGGERentry
     # evalute entry string to a numerical value
     try:
-        TRIGGERlevel = float(eval(TRIGGERentry.get()))
+        cf.TRIGGERlevel = float(eval(cf.TRIGGERentry.get()))
     except:
-        TRIGGERentry.delete(0,tk.END)
-        TRIGGERentry.insert(0, TRIGGERlevel)
+        cf.TRIGGERentry.delete(0,tk.END)
+        cf.TRIGGERentry.insert(0, cf.TRIGGERlevel)
     # set new trigger level
     
     UpdateTimeTrace()           # Always Update
@@ -244,7 +238,6 @@ def SetTriggerPoss(): # vermutlich überflüssig
         
 ## Routine to find rising edge of traces
 def FindRisingEdge(Trace1, Trace2):
-    global  LShift
     global CHAperiod, CHAfreq, CHBperiod, CHBfreq
     global CHAHW, CHALW, CHADCy, CHBHW, CHBLW, CHBDCy
     global CHABphase, CHBADelayR1, CHBADelayR2, CHBADelayF
@@ -255,8 +248,8 @@ def FindRisingEdge(Trace1, Trace2):
     hldn = int(cf.HoldOff * cf.SAMPLErate/1000)
 
     if cf.TgInput.get() > 0: # if triggering right shift arrays to undo trigger left shift
-        Trace1 = np.roll(Trace1, -LShift)
-        Trace2 = np.roll(Trace2, -LShift)
+        Trace1 = np.roll(Trace1, -cf.LShift)
+        Trace2 = np.roll(Trace2, -cf.LShift)
     else:
         Trace1 = np.roll(Trace1, -hldn)
         Trace2 = np.roll(Trace2, -hldn)
@@ -377,27 +370,24 @@ def FindRisingEdge(Trace1, Trace2):
 
 # Interpolate time between samples around trigger event
 def ReInterploateTrigger(TrgBuff):
-    global TRIGGERlevel
     cf.trgIpol = 0
     n = cf.TRIGGERsample
     DY = TrgBuff[int(n)] - TrgBuff[int(n+1)]
     if DY != 0.0:
-        cf.trgIpol = (TRIGGERlevel - TrgBuff[int(n+1)])/DY # calculate interpolated trigger point
+        cf.trgIpol = (cf.TRIGGERlevel - TrgBuff[int(n+1)])/DY # calculate interpolated trigger point
     else:
         cf.trgIpol = 0
 # Find the sample where trigger event happened 
 def FindTriggerSample(TrgBuff): # find trigger time sample point of passed waveform array
-    global AutoLevel, TRIGGERlevel, TRIGGERentry, Is_Triggered
-    global TRACEsize, HozPoss, hozpos
-    global LPFTrigger, TgEdge    
+    global TRACEsize, HozPoss, hozpos  
     # Set the TRACEsize variable
     TRACEsize = cf.SHOWsamples               # Set the trace length
     cf.trgIpol = 0
-    Is_Triggered = 0
-    if LPFTrigger.get() > 0:
+    cf.Is_Triggered = 0
+    if cf.LPFTrigger.get() > 0:
         TFiltCoef = [] # empty coef array
         for n in range(cf.Trigger_LPF_length.get()):
-            TFiltCoef.apptk.END(float(1.0/cf.Trigger_LPF_length.get()))
+            TFiltCoef.append(float(1.0/cf.Trigger_LPF_length.get()))
         TFiltCoef = np.array(TFiltCoef)
         TrgBuff = np.convolve(TrgBuff, TFiltCoef)
         
@@ -412,15 +402,10 @@ def FindTriggerSample(TrgBuff): # find trigger time sample point of passed wavef
     except:
         TrgMax = 0.0
     try: # Find trigger sample
-        if AutoLevel.get() == 1:
-            TRIGGERlevel = (TrgMin + TrgMax)/2
-            TRIGGERentry.delete(0,"tk.END")
-            TRIGGERentry.insert(0, ' {0:.4f} '.format(TRIGGERlevel))
-        else:
-            TRIGGERlevel = eval(TRIGGERentry.get())
+        cf.TRIGGERlevel = eval(cf.TRIGGERentry.get())
     except:
-        TRIGGERentry.delete(0,tk.END)
-        TRIGGERentry.insert(0, TRIGGERlevel)
+        cf.TRIGGERentry.delete(0,tk.END)
+        cf.TRIGGERentry.insert(0, cf.TRIGGERlevel)
     try: # Start from first sample after cf.HoldOff
         cf.HoldOff = float(eval(cf.HoldOffentry.get()))
         if cf.HoldOff < 0:
@@ -444,7 +429,7 @@ def FindTriggerSample(TrgBuff): # find trigger time sample point of passed wavef
     Nmax = int(TRACEsize / 1.5) # first 2/3 of data set
     cf.trgIpol = 0
     n = cf.TRIGGERsample
-    TRIGGERlevel2 = 0.99 * TRIGGERlevel # Hysteresis to avoid triggering on noise
+    TRIGGERlevel2 = 0.99 * cf.TRIGGERlevel # Hysteresis to avoid triggering on noise
     if TRIGGERlevel2 < TrgMin:
         TRIGGERlevel2 = TrgMin
     if TRIGGERlevel2 > TrgMax:
@@ -454,17 +439,17 @@ def FindTriggerSample(TrgBuff): # find trigger time sample point of passed wavef
     while ( ChInput >= TRIGGERlevel2) and n < Nmax:
         n = n + 1
         ChInput = TrgBuff[int(n)]
-    while (ChInput <= TRIGGERlevel) and n < Nmax:
+    while (ChInput <= cf.TRIGGERlevel) and n < Nmax:
         Prev = ChInput
         n = n + 1
         ChInput = TrgBuff[int(n)]
     DY = ChInput - Prev
     if DY != 0.0:
-        cf.trgIpol = (TRIGGERlevel - Prev)/DY # calculate interpolated trigger point
+        cf.trgIpol = (cf.TRIGGERlevel - Prev)/DY # calculate interpolated trigger point
     else:
         cf.trgIpol = 0
-    if TgEdge.get() == 1:
-        TRIGGERlevel2 = 1.01 * TRIGGERlevel
+    if cf.TgEdge.get() == 1:
+        TRIGGERlevel2 = 1.01 * cf.TRIGGERlevel
         if TRIGGERlevel2 < TrgMin:
             TRIGGERlevel2 = TrgMin
         if TRIGGERlevel2 > TrgMax:
@@ -474,21 +459,21 @@ def FindTriggerSample(TrgBuff): # find trigger time sample point of passed wavef
         while (ChInput <= TRIGGERlevel2) and n < Nmax:
             n = n + 1
             ChInput = TrgBuff[int(n)]
-        while (ChInput >= TRIGGERlevel) and n < Nmax:
+        while (ChInput >= cf.TRIGGERlevel) and n < Nmax:
             Prev = ChInput
             n = n + 1
             ChInput = TrgBuff[int(n)]
         DY = Prev - ChInput
         try:
-            cf.trgIpol = (Prev - TRIGGERlevel)/DY # calculate interpolated trigger point
+            cf.trgIpol = (Prev - cf.TRIGGERlevel)/DY # calculate interpolated trigger point
         except:
             cf.trgIpol = 0             
     if n < Nmax: # check to insure trigger point is in bounds
         cf.TRIGGERsample = n - 1
-        Is_Triggered = 1
+        cf.Is_Triggered = 1
     elif n > Nmax: # Didn't find edge in first 2/3 of data set
         cf.TRIGGERsample = 1 + hldn # reset to begining
-        Is_Triggered = 0
+        cf.Is_Triggered = 0
     if cf.trgIpol > 1:
         cf.trgIpol = 1 # never more than 100% of a sample period
     elif cf.trgIpol < 0:

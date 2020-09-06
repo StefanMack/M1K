@@ -7,10 +7,13 @@ S. Mack, 1.9.20
 import tkinter as tk
 import numpy as np
 
-root=tk.Tk()
+root=tk.Tk()       
+
 ca = None # Canvas (gesamter Bildschirmbereich)
 session = None # Zugriff auf die M1K-Session
 devx = None # Zugriff auf das M1K der Session
+CHA = CHB = None # M1K Instanzen für die beiden Kanäle A und B
+
 AWG_2X = 0 # Flag für Verdopplung Samplingrage (war vorher Checkbox)
 
 DevID = "No Device" # Seriennummer des M1K bzw. dieser String falls kein M1K angeschlossen
@@ -65,7 +68,9 @@ CHAIPosEntry = None
 CHBIPosEntry = None 
 
 HozPossentry = None # Horizontale Position mS
+TRIGGERentry = None
 TMsb = None # Spinbox mit Zeitablenkungswert
+TgEdge = None # steigende oder fallende Flanke
 
 HozPoss = 0.0 # horizontaler Offset Oszidarstellung
 LShift = 0 # hat was mit Trigger zu tun
@@ -132,6 +137,14 @@ AWGAMaxEntry = None
 AWGBMaxEntry = None
 AWGAFreqEntry = None
 AWGBFreqEntry = None
+AWGAShape = tk.IntVar(0) # Signalform AWGA
+AWGAShape.set(0) # Initialwert 0 = DC
+AWGBShape = tk.IntVar(0) # Signalform AWGB
+AWGBShape.set(0) # Initialwert 0 = DC
+
+AWGADutyCycleEntry = None # Duty Cacle Wert für Rechtecksignal
+AWGBDutyCycleEntry = None
+
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Tkinter Instanzierungen
@@ -159,7 +172,6 @@ RUNstatus = tk.IntVar(0) # 0 stopped, 1 start, 2 running, 3 stop now, 4 stop and
 TgInput = tk.IntVar(0)   # Trigger Input variable
 SingleShot = tk.IntVar(0) # variable for single shot triger
 ManualTrigger = tk.IntVar(0) # variable for Manual trigger
-AutoLevel = tk.IntVar(0) # variable for Auto Level trigger at mid point
 TgEdge = tk.IntVar(0)   # Trigger edge variable
 # Show channels variables
 ShowC1_V = tk.IntVar(0)   # curves to display variables
@@ -207,6 +219,8 @@ MarkerScale.set(1)
 SettingsStatus = tk.IntVar(0)
 
 # Arbiträrgenerator ADC-Mux-Modus
+# ADC-Mux-Modus
+
 ADC_Mux_Mode = tk.IntVar(0) # selection variable to set ADC CHA for voltagr or current 2X samplerate mode
 ADC_Mux_Mode.set(0)
 AWGAMode = tk.IntVar(0)   # AWG A mode SMVI (0), SIMV (1) oder Hi-Z (2)

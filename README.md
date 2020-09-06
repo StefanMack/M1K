@@ -15,3 +15,5 @@ Der ADALM1000 wird via USB mit dem PC verbunden. Angesteuert und ausgelesen wird
 Nähere Infos siehe: wiki.analog.com/university/tools/m1k
 
 In diesem Repository befinden sich Python-Programmbeispiele, die auf dem Pythonpackage pysmu (Wrapper der C-Bibliothek libsmu siehe github.com/analogdevicesinc/libsmu) von Analog Devices basieren.
+
+![Screenshot AliceLight](/alicelight_screenshot)

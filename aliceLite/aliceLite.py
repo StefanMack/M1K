@@ -5,8 +5,12 @@
 # Based on Code wirtten by D Mercer ()
 # https://github.com/analogdevicesinc/alice/tree/Version-1.3
 #
-# Version 3:
-# Darstellung Messwerte unter Scope, Abstände und Grid-Platzierung Widgets
+# Version 4:
+# AWG nur noch mit Basis-Signalformen und ohne doppelte Samplingrate.
+# AWG-Terminierung fest auf "open"
+# Math-Funktionen verifiziert
+# M1K Samplingfunktionen verifiziert
+# Ungenutzte globale Variable entfernt
 # *****************************************************************************
 # Light Version alice-desctop 1.38, S. Mack, 5.9.2020
 # *****************************************************************************
@@ -28,15 +32,23 @@ from aliceAwgFunc import ReMakeAWGwaves
 from aliceMenus import (UpdateAWGMenu, MakeSampleRateMenu, onSpinBoxScroll,
 MakeSettingsMenu, MakeMathMenu, CreateToolTip, onTextKey, MakeAWGMenuInside)
 # Samplingfunktionen des M1K
-from aliceM1kSamp import TraceSelectADC_Mux, BAWG2X
+from aliceM1kSamp import TraceSelectADC_Mux, Analog_In
 # Oszillsokopfunktionen
 from aliceOsciFunc import (BStop, BTime, BHozPoss, BCHAlevel,
 BCHAIlevel, BCHBlevel, BCHBIlevel, BOffsetA, BIOffsetA, BOffsetB, BIOffsetB,
 BStart, UpdateTimeAll, UpdateTimeTrace, UpdateTimeScreen, BHoldOff,
 BTrigger50p, BTriglevel)
 
+import logging
+
+# Nachfolgende Zeile für Debugmeldungen ausschalten (level=10 bedeutet alle Meldungen)
+logging.basicConfig(level=10)
+logging.basicConfig(filename='logDatei.log', level=10)
+
 RevDate = "(5 Sep 2020)"
 SWRev = "1.38litev3 "
+
+
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
 CHvpdiv = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
@@ -91,7 +103,7 @@ cf.root.style.configure("Run.TButton", background=cf.ButtonGreen, width=4, relie
 # Button zum Verbindungsaufbau/-trennen mit dem M1K (ändert Farbe je nach Zustand)
 cf.root.style.configure("RConn.TButton", background=cf.ButtonRed, width=5, relief=tk.RAISED)
 cf.root.style.configure("GConn.TButton", background=cf.ButtonGreen, width=5, relief=tk.RAISED)
-# Buttons für vier Traces, "R" = raised, "S" = sunken
+# Buttons für vier Traces und Math-Trace, "R" = raised, "S" = sunken
 cf.root.style.configure("Rtrace1.TButton", background=cf.COLORtrace1, width=9, relief=tk.RAISED)
 cf.root.style.configure("Strace1.TButton", background=cf.COLORtrace1, width=9, relief=tk.SUNKEN)
 cf.root.style.configure("Rtrace2.TButton", background=cf.COLORtrace2, width=9, relief=tk.RAISED)
@@ -100,7 +112,9 @@ cf.root.style.configure("Rtrace3.TButton", background=cf.COLORtrace3, width=9, r
 cf.root.style.configure("Strace3.TButton", background=cf.COLORtrace3, width=9, relief=tk.SUNKEN)
 cf.root.style.configure("Rtrace4.TButton", background=cf.COLORtrace4, width=9, relief=tk.RAISED)
 cf.root.style.configure("Strace4.TButton", background=cf.COLORtrace4, width=9, relief=tk.SUNKEN)
-cf.root.style.configure("A10R1.TLabelframe.Label", foreground=cf.COLORtraceR1, font=('Arial', 10, 'bold'))
+cf.root.style.configure("Math.TButton", background=cf.COLORtrace5, width=4, relief=tk.RAISED)
+
+cf.root.style.configure("A10R1.TLabelframe.Label", foreground=cf.COLORtrace5, font=('Arial', 10, 'bold')) # Math Trace Purpur
 cf.root.style.configure("A10R1.TLabelframe", borderwidth=5, relief=tk.RIDGE)
 cf.root.style.configure("A10R2.TLabelframe.Label", foreground=cf.COLORtraceR2, font=('Arial', 10, 'bold'))
 cf.root.style.configure("A10R2.TLabelframe", borderwidth=5, relief=tk.RIDGE)
@@ -294,7 +308,7 @@ def onCAresize(event):
 #DevID = "No Device" # Initialisierung
 
 def ConSingDev():
-    global CHA, CHB
+    logging.info('ConSingDev()')
     global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
     if cf.DevID == "No Device":
         cf.session = smu.Session(ignore_dataflow=True, sample_rate=cf.SAMPLErate, queue_size=cf.MaxSamples)
@@ -310,14 +324,15 @@ def ConSingDev():
         cf.DevID = cf.devx.serial
         print("Device ID:" + str(cf.DevID))
         FWRevOne = float(cf.devx.fwver)
+
         HWRevOne = str(cf.devx.hwver)
         print( FWRevOne, HWRevOne)   
         if FWRevOne < 2.17:
             tkm.showwarning("WARNING","This ALICE version Requires Firmware version > 2.16")
-        CHA = cf.devx.channels['A']    # Open CHA
-        CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
-        CHB = cf.devx.channels['B']    # Open CHB
-        CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode  
+        cf.CHA = cf.devx.channels['A']    # Open CHA
+        cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
+        cf.CHB = cf.devx.channels['B']    # Open CHB
+        cf.CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode  
         # Hier unterscheiden sich die beiden Hardware-Revisions
         cf.devx.set_adc_mux(0)
         if cf.devx.hwver == "F":
@@ -344,7 +359,7 @@ def ConSingDev():
         cf.devx.ctrl_transfer(0x40, 0x24, 0x0, 0, 0, 0, 100) # set to addr DAC A 
         cf.devx.ctrl_transfer(0x40, 0x25, 0x1, 0, 0, 0, 100) # set not addr DAC B
         try:
-            cf.session.start(0)
+            cf.session.start(0) # Start kontinuierlicher Modus des M1K
             cf.devx.set_led(0b010) # set LED.green
             m1kcon.configure(text="M1K", style="GConn.TButton")
         except:
@@ -427,19 +442,18 @@ def BLoadConfig(filename):
 
 # Function to close and exit ALICE
 def Bcloseexit():
-    global CHA, CHB
     cf.RUNstatus.set(0)
     # BSaveConfig("alice-last-config.cfg")
     try:
+        cf.devx.set_led(0b100) # LED auf Blau setzen
         # Put channels in Hi-Z and exit
-        CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
-        CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode
+        cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
+        cf.CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode
         cf.devx.set_adc_mux(0) # set ADC mux conf to default
         cf.AWG_2X(0)
-        BAWG2X()
-        CHA.constant(0.0)
-        CHB.constant(0.0)
-        cf.devx.set_led(0b001) # Set LED.red on the way out
+        #BAWG2X()
+        cf.CHA.constant(0.0)
+        cf.CHB.constant(0.0)
     except:
         pass
     cf.root.destroy()
@@ -476,7 +490,6 @@ Triggermenu.menu.add_radiobutton(label='CA-V', variable=cf.TgInput, value=1)
 Triggermenu.menu.add_radiobutton(label='CA-I', variable=cf.TgInput, value=2)
 Triggermenu.menu.add_radiobutton(label='CB-V', variable=cf.TgInput, value=3)
 Triggermenu.menu.add_radiobutton(label='CB-I', variable=cf.TgInput, value=4)
-Triggermenu.menu.add_checkbutton(label='Auto Level', variable=cf.AutoLevel)
 Triggermenu.menu.add_checkbutton(label='Low Pass Filter', variable=cf.LPFTrigger)
 Triggermenu.menu.add_checkbutton(label='Manual Trgger', variable=cf.ManualTrigger)
 Triggermenu.menu.add_checkbutton(label='SingleShot', variable=cf.SingleShot)
@@ -491,11 +504,11 @@ Edgemenu.pack(side=tk.LEFT)
 
 tlab = ttk.Label(frame1, text="Trig Level (V/mA):")
 tlab.pack(side=tk.LEFT)
-TRIGGERentry = tk.Entry(frame1, width=5)
-TRIGGERentry.bind("<Return>", BTriglevel)
-TRIGGERentry.pack(side=tk.LEFT)
-TRIGGERentry.delete(0,tk.END)
-TRIGGERentry.insert(0,0.0)
+cf.TRIGGERentry = tk.Entry(frame1, width=5)
+cf.TRIGGERentry.bind("<Return>", BTriglevel)
+cf.TRIGGERentry.pack(side=tk.LEFT)
+cf.TRIGGERentry.delete(0,tk.END)
+cf.TRIGGERentry.insert(0,2.5)
 
 tgb = ttk.Button(frame1, text="50%", style="W4.TButton", command=BTrigger50p)
 tgb.pack(side=tk.LEFT)
@@ -508,9 +521,12 @@ cf.HoldOffentry.pack(side=tk.LEFT)
 cf.HoldOffentry.delete(0,tk.END)
 cf.HoldOffentry.insert(0,0.0)
 
+hint = ttk.Label(frame1, text=" at numeric inputs \n press <Return> to confirm")
+hint.pack(side=tk.LEFT, padx=(20,0))
+
 Triggermenu_tip = CreateToolTip(Triggermenu, 'Triggerquelle')
 Edgemenu_tip = CreateToolTip(Edgemenu, 'Triggerflanke')
-Triglevel_tip = CreateToolTip(TRIGGERentry, 'Triggerschwelle')
+Triglevel_tip = CreateToolTip(cf.TRIGGERentry, 'Triggerschwelle')
 tgb_tip = CreateToolTip(tgb, 'Triggerschwelle auf 50 % setzen')
 hldlab_tip = CreateToolTip(hldlab, 'Increment Hold Off setting by one time division')
 
@@ -662,7 +678,7 @@ MeasmenuB.menu.add_checkbutton(label='Period', variable=cf.MeasBPER)
 MeasmenuB.menu.add_checkbutton(label='Freq', variable=cf.MeasBFREQ)
 MeasmenuB.pack(side=tk.LEFT)
 
-mathbt = ttk.Button(dropmenu2, text="Math", style="W4.TButton", command = MakeMathMenu)
+mathbt = ttk.Button(dropmenu2, text="Math", style="Math.TButton", command = MakeMathMenu)
 mathbt.pack(side=tk.RIGHT, anchor=tk.W)
 
 math_tip = CreateToolTip(mathbt, 'Open Math window')
@@ -759,14 +775,14 @@ cf.CHBIOffsetEntry.insert(0,0.0)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # AWG Menü
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-AWGAlab = ttk.Label(frame2r, text="AWG CA")
+AWGAlab = ttk.Label(frame2r, text="AWG Channel A")
 AWGAlab.pack(side=tk.TOP, pady=(8,0))
 cf.AWGAMenus= ttk.Frame(frame2r)
 cf.AWGAMenus.pack(side=tk.TOP)
 cf.AWGASet= ttk.Frame(frame2r)
 cf.AWGASet.pack(side=tk.TOP)
 
-AWGBlab = ttk.Label(frame2r, text="AWG CB")
+AWGBlab = ttk.Label(frame2r, text="AWG Channel B")
 AWGBlab.pack(side=tk.TOP, pady=(8,0))
 cf.AWGBMenus= ttk.Frame(frame2r)
 cf.AWGBMenus.pack(side=tk.TOP)
@@ -857,7 +873,7 @@ CHBIofflab_tip = CreateToolTip(CHBIofflab, 'Set CHB-I position to DC average of 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Hauptroutine
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#ConSingDev() # Connect a single (only one connected) M1K device
+ConSingDev() # Connect a single (only one connected) M1K device
 #BLoadConfig("default-config.cfg") # load default configuration
 cf.root.update() # Activate updated screens  
-#Analog_In() # Start sampling
+Analog_In() # Start sampling

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 30.8.20
+S. Mack, 7.9.20
 """
 import math
 import time
@@ -14,8 +14,10 @@ from aliceTimeFunc import MakeTimeTrace, MakeTimeScreen
 from aliceAwgFunc import BAWGEnab
 import aliceM1kSamp as m1k
 import config as cf
+import logging
 
 PowerStatus = 1 # 0 stopped, 1 start, 2 running, 3 stop and restart, 4 stop
+HozPoss = 0 #
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Oszilloskop Funktionen Vertikal-/Horizontaldarstellung
@@ -23,6 +25,7 @@ PowerStatus = 1 # 0 stopped, 1 start, 2 running, 3 stop and restart, 4 stop
     
 ## Stop (pause) scope tool
 def BStop():
+    logging.debug('BStop()')
     if (cf.RUNstatus.get() == 1):
         # print("Stoping")
         cf.RUNstatus.set(0)
@@ -37,6 +40,7 @@ def BStop():
 
 # Set Hor time scale from entry widget
 def BTime():
+    logging.debug('BTime()')
     try: # get time scale in mSec/div
         cf.TIMEdiv = float(eval(cf.TMsb.get()))
         if cf.TIMEdiv < 0.0002:
@@ -61,14 +65,17 @@ def BTime():
 
 #---Set Horx possition from entry widget
 def BHozPoss(event):
+    logging.debig('BHozPoss()')
     global HozPoss
     try:
         HozPoss = float(eval(cf.HozPossentry.get()))
+        logging.debug('BHozPoss() with HozPoss = {}'.format(float(eval(cf.HozPossentry.get()))))
     except:
         cf.HozPossentry.delete(0,tk.END)
         cf.HozPossentry.insert(0, HozPoss)
 
-def BCHAlevel(): 
+def BCHAlevel():
+    logging.debug('BCHAlevel()')
     try:
         CH1vpdvLevel = float(eval(cf.CHAsb.get()))
     except:
@@ -77,6 +84,7 @@ def BCHAlevel():
     UpdateTimeTrace()           # Always Update
 
 def BCHAIlevel():
+    logging.debug('BCHAIlevel()')
     try:
         CH1ipdvLevel = float(eval(cf.CHAIsb.get()))
     except:
@@ -84,7 +92,8 @@ def BCHAIlevel():
         cf.CHAIsb.insert(0, CH1ipdvLevel)
     UpdateTimeTrace()           # Always Update
 
-def BCHBlevel(): 
+def BCHBlevel():
+    logging.debug('BCHBlevel()')
     try:
         CH2vpdvLevel = float(eval(cf.CHBsb.get()))
     except:
@@ -92,7 +101,8 @@ def BCHBlevel():
         cf.CHBsb.insert(0, CH2vpdvLevel)
     UpdateTimeTrace()           # Always Update    
 
-def BCHBIlevel():   
+def BCHBIlevel():
+    logging.debug('BCHBIlevel()')
     try:
         CH2ipdvLevel = float(eval(cf.CHBIsb.get()))
     except:
@@ -101,6 +111,7 @@ def BCHBIlevel():
     UpdateTimeTrace()           # Always Update    
 
 def BOffsetA(event):
+    logging.debug('BOffsetA()')
     try:
         CHAVOffset = float(eval(cf.CHAVPosEntry.get()))
     except:
@@ -109,6 +120,7 @@ def BOffsetA(event):
     UpdateTimeTrace()           # Always Update
 
 def BIOffsetA(event):
+    logging.debug('BIOffsetA()')
     try:
         CHAIOffset = float(eval(cf.CHAIPosEntry.get()))
     except:
@@ -117,6 +129,7 @@ def BIOffsetA(event):
     UpdateTimeTrace()           # Always Update
 
 def BOffsetB(event):
+    logging.debug('BOffsetB()')
     try:
         CHBVOffset = float(eval(cf.CHBVPosEntry.get()))
     except:
@@ -125,6 +138,7 @@ def BOffsetB(event):
     UpdateTimeTrace()           # Always Update
 
 def BIOffsetB(event):
+    logging.debug('BIOffsetB()')
     try:
         CHBIOffset = float(eval(cf.CHBIPosEntry.get()))
     except:
@@ -134,6 +148,7 @@ def BIOffsetB(event):
 
 ## Start aquaring scope time data
 def BStart():
+    logging.debug('BStart()')
     global PowerStatus
     global First_Slow_sweep
     if cf.DevID == "No Device":
@@ -155,30 +170,32 @@ def BStart():
     else:
         First_Slow_sweep = 1
       
-
 ## Update Data, trace and time screen
-def UpdateTimeAll():         
+def UpdateTimeAll():
+    logging.debug('UpdateTimeAll()')         
     MakeTimeTrace()         # Update the traces
     UpdateTimeScreen()      # Update the screen 
 
 ## Update time trace and screen
 def UpdateTimeTrace():      
+    logging.debug('UpdateTimeTrace()')
     MakeTimeTrace()         # Update traces
     UpdateTimeScreen()      # Update the screen
 
 ## Update time screen with trace and text
 def UpdateTimeScreen():
+    logging.debug('UpdateTimeScreen()')
     MakeTimeScreen() # Update the screen
     cf.MarkerNum = 0 # Marker wurden durch MakeTimeScreen() gelöscht, jetzt noch Position 1. Marker wieder zurücksetzen 
     cf.root.update() # Activate updated screens    
 
         
-
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Oszilloskop Tiggerfunktionen
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #--- Set Trigger level to 50% (mid) point of current waveform
 def BTrigger50p():
+    logging.debug('BTrigger50p()')
     # set new trigger level to mid point of waveform    
     MidV1 = (cf.MaxV1+cf.MinV1)/2
     MidV2 = (cf.MaxV2+cf.MinV2)/2
@@ -201,6 +218,7 @@ def BTrigger50p():
    
 #---Auf Eingabe neue Triggerschwelle reagieren
 def BTriglevel(event):
+    logging.debug('BTriglevel()')
     # evalute entry string to a numerical value
     try:
         cf.TRIGGERlevel = float(eval(cf.TRIGGERentry.get()))
@@ -213,6 +231,7 @@ def BTriglevel(event):
 
 #--- Set Hold off time from entry widget
 def BHoldOff(event):
+    logging.debug('BHoldOff()')
     try:
         cf.HoldOff = float(eval(cf.HoldOffentry.get()))
     except:
@@ -221,12 +240,12 @@ def BHoldOff(event):
         
 #---Triggerzeitpunkt für gegebene Schwelle ermitteln
 def SetTriggerPoss(): # vermutlich überflüssig
-    # get time scale
-    try:
+    logging.debug('SetTriggerPoss()')
+    try: # get time scale
         cf.TIMEdiv = float(eval(cf.TMsb.get()))
     except:
         cf.TIMEdiv = 0.5
-        cf.TMsb.delete(0,"tk.END")
+        cf.TMsb.delete(0,tk.END)
         cf.TMsb.insert(0,cf.TIMEdiv)
     # prevent divide by zero error
     if cf.TIMEdiv < 0.0002:
@@ -236,8 +255,9 @@ def SetTriggerPoss(): # vermutlich überflüssig
         cf.HozPossentry.delete(0,tk.END)
         cf.HozPossentry.insert(0, HozPoss)
         
-## Routine to find rising edge of traces
+# Routine to find rising edge of traces
 def FindRisingEdge(Trace1, Trace2):
+    logging.debug('FindRisingEdge()')
     global CHAperiod, CHAfreq, CHBperiod, CHBfreq
     global CHAHW, CHALW, CHADCy, CHBHW, CHBLW, CHBDCy
     global CHABphase, CHBADelayR1, CHBADelayR2, CHBADelayF
@@ -347,14 +367,14 @@ def FindRisingEdge(Trace1, Trace2):
                     bnf1 = BIfalling[1]
             except:
                 bnf1 = 1
-    #
+    
     CHAHW = float(((anf1 - anr1) * 1000.0) / cf.SAMPLErate)
     CHALW = float(((anr2 - anf1) * 1000.0) / cf.SAMPLErate)
     CHADCy = float(anf1 - anr1) / float(anr2 - anr1) * 100.0 # in percent
     CHBHW = float(((bnf1 - bnr1) * 1000.0) / cf.SAMPLErate)
     CHBLW = float(((bnr2 - bnf1) * 1000.0) / cf.SAMPLErate)
     CHBDCy = float(bnf1 - bnr1) / float(bnr2 - bnr1) * 100.0 # in percent
-#
+
     if bnr1 > anr1:
         CHBADelayR1 = float((bnr1 - anr1) * 1000.0 / cf.SAMPLErate)
     else:
@@ -370,6 +390,7 @@ def FindRisingEdge(Trace1, Trace2):
 
 # Interpolate time between samples around trigger event
 def ReInterploateTrigger(TrgBuff):
+    logging.debug('ReInterploateTrigger()')
     cf.trgIpol = 0
     n = cf.TRIGGERsample
     DY = TrgBuff[int(n)] - TrgBuff[int(n+1)]
@@ -379,6 +400,7 @@ def ReInterploateTrigger(TrgBuff):
         cf.trgIpol = 0
 # Find the sample where trigger event happened 
 def FindTriggerSample(TrgBuff): # find trigger time sample point of passed waveform array
+    logging.debug('FindTriggerSample()')
     global TRACEsize, HozPoss, hozpos  
     # Set the TRACEsize variable
     TRACEsize = cf.SHOWsamples               # Set the trace length
@@ -402,7 +424,7 @@ def FindTriggerSample(TrgBuff): # find trigger time sample point of passed wavef
     except:
         TrgMax = 0.0
     try: # Find trigger sample
-        cf.TRIGGERlevel = eval(cf.TRIGGERentry.get())
+        cf.TRIGGERlevel = float(eval(cf.TRIGGERentry.get()))
     except:
         cf.TRIGGERentry.delete(0,tk.END)
         cf.TRIGGERentry.insert(0, cf.TRIGGERlevel)

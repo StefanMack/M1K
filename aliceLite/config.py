@@ -66,6 +66,12 @@ CHAVPosEntry = None # Eingabefenster Nulllinie V CH A in UI neben Skalierung
 CHBVPosEntry = None
 CHAIPosEntry = None
 CHBIPosEntry = None 
+#Aktuelle Werte für Horizontalskalierung und -offset
+CHAVScale = CHBVScale = 0.5
+CHAVOffset = CHBVOffset = 2.5
+CHAIScale = CHBIScale =  50.0
+CHAIOffset = CHBIOffset = 0.0
+
 
 HozPossentry = None # Horizontale Position mS
 TRIGGERentry = None

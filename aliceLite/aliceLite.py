@@ -12,11 +12,11 @@
 # M1K Samplingfunktionen verifiziert
 # Ungenutzte globale Variable entfernt
 # *****************************************************************************
-# Light Version alice-desctop 1.38, S. Mack, 5.9.2020
+# Light Version alice-desctop 1.38, S. Mack, 7.9.2020
 # *****************************************************************************
 
-import time
-#import numpy as np
+
+import logging
 import tkinter as tk
 import tkinter.font as tkf
 import tkinter.messagebox as tkm
@@ -26,10 +26,8 @@ from tkinter.filedialog import asksaveasfilename
 import pysmu as smu # auskommentiert, wenn kein M1K angeschlossen
 import config as cf # hier stehen alle ehemaligen globalen Variablen drin
 from aliceIcons import hipulse, lowpulse, TBicon # Bilddateien der Icons
-# AWG Funktionen
-from aliceAwgFunc import ReMakeAWGwaves
 # Thinter UI Menüs
-from aliceMenus import (UpdateAWGMenu, MakeSampleRateMenu, onSpinBoxScroll,
+from aliceMenus import (MakeSampleRateMenu, onSpinBoxScroll,
 MakeSettingsMenu, MakeMathMenu, CreateToolTip, onTextKey, MakeAWGMenuInside)
 # Samplingfunktionen des M1K
 from aliceM1kSamp import TraceSelectADC_Mux, Analog_In
@@ -39,16 +37,13 @@ BCHAIlevel, BCHBlevel, BCHBIlevel, BOffsetA, BIOffsetA, BOffsetB, BIOffsetB,
 BStart, UpdateTimeAll, UpdateTimeTrace, UpdateTimeScreen, BHoldOff,
 BTrigger50p, BTriglevel)
 
-import logging
-
-# Nachfolgende Zeile für Debugmeldungen ausschalten (level=10 bedeutet alle Meldungen)
-logging.basicConfig(level=10)
+# Nachfolgende Zeile für Debugmeldungen ausschalten (level=0 bedeutet alle Meldungen)
+# DEBUG 10, INFO 20, WARNING 30
+logging.basicConfig(level=20)
 logging.basicConfig(filename='logDatei.log', level=10)
 
-RevDate = "(5 Sep 2020)"
-SWRev = "1.38litev3 "
-
-
+RevDate = "(7 Sep 2020)"
+SWRev = "0.1 "
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
 CHvpdiv = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
@@ -60,7 +55,7 @@ TMpdiv = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Tkinter UI Initialisierungen und Styles (Instanzierung root in config.py)
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-print("Windowing System is " + str(cf.root.tk.call('tk', 'windowingsystem')))
+logging.debug("Windowing System is " + str(cf.root.tk.call('tk', 'windowingsystem')))
 cf.root.style = ttk.Style()
 # siehe wiki.tcl-lang.org/page/List+of+ttk+Themes
 if (cf.root.tk.call('tk', 'windowingsystem')=='aqua'):
@@ -71,12 +66,12 @@ try:
     cf.root.style.theme_use(Style_String) 
 except:
     cf.root.style.theme_use('default')
-    print("ttk.Style default is used")
+    logging.debug("ttk.Style default is used")
 
 default_font = tkf.nametofont("TkDefaultFont")
 default_font.configure(size=cf.FontSize)
 
-cf.root.title("ALICE DeskTop Lite " + SWRev + RevDate + ": ALM1000 Oscilloscope")
+cf.root.title("aliceLite " + SWRev + RevDate)
 
 img = tk.PhotoImage(data=TBicon) # Programm Icon
 hipulseimg = tk.PhotoImage(data=hipulse) # Icon für Trigger Rising Edge
@@ -97,7 +92,7 @@ cf.root.style.configure("W7.TButton", width=7, relief=tk.RAISED)
 cf.root.style.configure("W8.TButton", width=8, relief=tk.RAISED)
 cf.root.style.configure("W12.TButton", width=12, relief=tk.RAISED)
 cf.root.style.configure("W16.TButton", width=16, relief=tk.RAISED)
-
+# Run/Stop-Button
 cf.root.style.configure("Stop.TButton", background=cf.ButtonRed, width=4, relief=tk.RAISED)
 cf.root.style.configure("Run.TButton", background=cf.ButtonGreen, width=4, relief=tk.RAISED)
 # Button zum Verbindungsaufbau/-trennen mit dem M1K (ändert Farbe je nach Zustand)
@@ -113,8 +108,8 @@ cf.root.style.configure("Strace3.TButton", background=cf.COLORtrace3, width=9, r
 cf.root.style.configure("Rtrace4.TButton", background=cf.COLORtrace4, width=9, relief=tk.RAISED)
 cf.root.style.configure("Strace4.TButton", background=cf.COLORtrace4, width=9, relief=tk.SUNKEN)
 cf.root.style.configure("Math.TButton", background=cf.COLORtrace5, width=4, relief=tk.RAISED)
-
-cf.root.style.configure("A10R1.TLabelframe.Label", foreground=cf.COLORtrace5, font=('Arial', 10, 'bold')) # Math Trace Purpur
+# Labels
+cf.root.style.configure("A10R1.TLabelframe.Label", foreground=cf.COLORtrace5, font=('Arial', 10, 'bold'))
 cf.root.style.configure("A10R1.TLabelframe", borderwidth=5, relief=tk.RIDGE)
 cf.root.style.configure("A10R2.TLabelframe.Label", foreground=cf.COLORtraceR2, font=('Arial', 10, 'bold'))
 cf.root.style.configure("A10R2.TLabelframe", borderwidth=5, relief=tk.RIDGE)
@@ -132,6 +127,7 @@ cf.root.style.configure("Strace4.TCheckbutton", background=cf.COLORtrace4)
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #--- Cursorpostion setzen mit Maus-Klick bzw. ändern mit Maus-Scroll oder Pfeiltasten
 def onCanvasClickRight(event): # Cursorkreuz setzen
+    logging.debug("onCanvasClickRight() x={0} y={1}".format(event.x, event.y))
     cf.TCursor = event.x # Cursor Horizontal
     cf.VCursor = event.y # Cursor Vertikal ( V oder mA)
     if cf.RUNstatus.get() == 0: # Testweise
@@ -141,6 +137,7 @@ def onCanvasClickRight(event): # Cursorkreuz setzen
 #--- Setzen von Markern via Maus-Linksklick, deren xy-Koordinaten grün im Scanbild erscheinen
 #--- funktioniert nur im Stopp-Modus
 def onCanvasClickLeft(event):
+    logging.debug("onCanvasClickLeft() x={0} y={1}".format(event.x, event.y))
     global PrevV, PrevT
     try:
         cf.HoldOff = float(eval(cf.HoldOffentry.get()))
@@ -162,48 +159,48 @@ def onCanvasClickLeft(event):
     # add markers only if stopped
     if cf.RUNstatus.get() == 0 and cf.ShowCur.get() > 0:
         cf.MarkerNum = cf.MarkerNum + 1
-        # aktuelle Vertikalskalierungen und -offsets auslesen !! Ohne try/excpet wie in aliceTimeFunc
-        CHAVScale = float(eval(cf.CHAsb.get()))
-        CHBVScale = float(eval(cf.CHBsb.get()))
-        CHAIScale = float(eval(cf.CHAIsb.get()))
-        CHBIScale = float(eval(cf.CHBIsb.get()))
-        CHAVOffset = float(eval(cf.CHAVPosEntry.get()))           
-        CHAIOffset = float(eval(cf.CHAIPosEntry.get()))
-        CHBVOffset = float(eval(cf.CHBVPosEntry.get()))
-        CHAIOffset = float(eval(cf.CHBIPosEntry.get()))
-
-        # prevent divide by zero error
-        if CHAVScale < 0.001:
-            CHAVScale = 0.001
-        if CHBVScale < 0.001:
-            CHBVScale = 0.001
-        if CHAIScale < 1.0:
-            CHAIScale = 1.0
-        if CHBIScale < 1.0:
-            CHBIScale = 1.0
-        Yoffset1 = CHAVOffset
+        # aktuelle Vertikalskalierungen und -offsets auslesen 
+         
+        cf.CHAVScale = float(eval(cf.CHAsb.get())) # Ohne try/excpet wie in aliceTimeFunc
+        cf.CHBVScale = float(eval(cf.CHBsb.get())) # da hier nicht nötig weil keine Neueingabe
+        cf.CHAIScale = float(eval(cf.CHAIsb.get()))
+        cf.CHBIScale = float(eval(cf.CHBIsb.get()))
+        cf.CHAVOffset = float(eval(cf.CHAVPosEntry.get()))           
+        cf.CHAIOffset = float(eval(cf.CHAIPosEntry.get()))
+        cf.CHBVOffset = float(eval(cf.CHBVPosEntry.get()))
+        cf.CHAIOffset = float(eval(cf.CHBIPosEntry.get()))
+     
+        if cf.CHAVScale < 0.001: # prevent divide by zero error
+            cf.CHAVScale = 0.001
+        if cf.CHBVScale < 0.001:
+            cf.CHBVScale = 0.001
+        if cf.CHAIScale < 1.0:
+            cf.CHAIScale = 1.0
+        if cf.CHBIScale < 1.0:
+            cf.CHBIScale = 1.0
+        Yoffset1 = cf.CHAVOffset
         if cf.ShowCur.get() == 1:
-            Yconv1 = float(cf.GRH/10.0) / CHAVScale
-            Yoffset1 = CHAVOffset
+            Yconv1 = float(cf.GRH/10.0) / cf.CHAVScale
+            Yoffset1 = cf.CHAVOffset
             COLORmarker = cf.COLORtrace1
             Units = " V"
         elif cf.ShowCur.get() == 2:
-            Yconv1 = float(cf.GRH/10.0) / CHBVScale
-            Yoffset1 = CHBVOffset
+            Yconv1 = float(cf.GRH/10.0) / cf.CHBVScale
+            Yoffset1 = cf.CHBVOffset
             COLORmarker = cf.COLORtrace2
             Units = " V"
         elif cf.ShowCur.get() == 3:
-            Yconv1 = float(cf.GRH/10.0) / CHAIScale
-            Yoffset1 = CHAIOffset
+            Yconv1 = float(cf.GRH/10.0) / cf.CHAIScale
+            Yoffset1 = cf.CHAIOffset
             COLORmarker = cf.COLORtrace3
             Units = " mA"
         elif cf.ShowCur.get() == 4:
-            Yconv1 = float(cf.GRH/10.0) / CHBIScale
-            Yoffset1 = CHAIOffset
+            Yconv1 = float(cf.GRH/10.0) / cf.CHBIScale
+            Yoffset1 = cf.CHAIOffset
             COLORmarker = cf.COLORtrace4
             Units = " mA"
             
-        c1 = cf.GRH / 2.0 + cf.Y0T    # fixed correction channel A
+        c1 = cf.GRH / 2.0 + cf.Y0T
         # draw X at marker point and number
         cf.ca.create_line(event.x-4, event.y-4,event.x+4, event.y+5, fill=cf.COLORtext)
         cf.ca.create_line(event.x+4, event.y-4,event.x-4, event.y+5, fill=cf.COLORtext)
@@ -255,45 +252,11 @@ def onCanvasClickLeft(event):
         cf.ca.create_text(x, y, text=V_label, fill=COLORmarker, anchor=Justify, font=("arial", cf.FontSize ))
         PrevV = yvolts
         PrevT = Tpoint
-
-def onTextScroll(event):   # Use mouse wheel to scroll entry values, august 7
-    button = event.widget
-    cursor_position = button.index(tk.INSERT) # get current cursor position
-    Pos = cursor_position
-    OldVal = button.get() # get current entry string
-    OldValfl = float(OldVal) # and its value
-    Len = len(OldVal)
-    Dot = OldVal.find (".")  # find decimal point position
-    Decimals = Len - Dot - 1
-    if Dot == -1 : # no point
-        Decimals = 0             
-        Step = 10**(Len - Pos)
-    elif Pos <= Dot : # no point left of position
-        Step = 10**(Dot - Pos)
-    else:
-        Step = 10**(Dot - Pos + 1)
-    # respond to Linux or Windows wheel event
-    if event.num == 5 or event.delta == -120:
-        NewVal = OldValfl - Step
-    if event.num == 4 or event.delta == 120:
-        NewVal = OldValfl + Step
-    FormatStr = "{0:." + str(Decimals) + "f}"
-    NewStr = FormatStr.format(NewVal)
-    NewDot = NewStr.find (".") 
-    NewPos = Pos + NewDot - Dot
-    if Decimals == 0 :
-        NewLen = len(NewStr)
-        NewPos = Pos + NewLen - Len
-    button.delete(0, tk.END) # remove old entry
-    button.insert(0, NewStr) # insert new entry
-    button.icursor(NewPos) # resets the insertion cursor
-
-
-def onCanvasMouse_xy(event):
-    cf.MouseWidget = event.widget
-    cf.MouseX, cf.MouseY = event.x, event.y
+        
     
 def onCAresize(event):
+    logging.debug("onCAresize()")
+    event.widget
     cf.XOL = cf.FontSize * 7
     cf.CANVASwidth = event.width - 4
     cf.CANVASheight = event.height - 4
@@ -308,10 +271,14 @@ def onCAresize(event):
 #DevID = "No Device" # Initialisierung
 
 def ConSingDev():
-    logging.info('ConSingDev()')
+    logging.debug('ConSingDev()')
     global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
     if cf.DevID == "No Device":
-        cf.session = smu.Session(ignore_dataflow=True, sample_rate=cf.SAMPLErate, queue_size=cf.MaxSamples)
+        try:
+            cf.session = smu.Session(ignore_dataflow=True, sample_rate=cf.SAMPLErate, queue_size=cf.MaxSamples)
+        except:
+            tkm.showwarning("WARNING", "M1K buisy - please reconnect USB and press the red M1K-Connect Button.")
+            return
         if not cf.session.devices:
             tkm.showwarning("WARNING","No Device Plugged In!")
             cf.DevID = "No Device"
@@ -363,7 +330,7 @@ def ConSingDev():
             cf.devx.set_led(0b010) # set LED.green
             m1kcon.configure(text="M1K", style="GConn.TButton")
         except:
-            tkm.showwarning("M1K could not be connected.")
+            tkm.showwarning("WARNING", "M1K could not be connected.")
         
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -419,26 +386,26 @@ def BSaveData():
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Utilities
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Load configuration from a file, im Config File stehen zeilenwese Befehle
-# welche ausgeführt werden
-def BLoadConfig(filename):
-    # Read configuration values from file
-    try:
-        ConfgFile = open(filename)
-        for line in ConfgFile:
-            try:
-                exec(line.rstrip())
-            except:
-                print( "Skipping " + line.rstrip())
-        ConfgFile.close()
-        UpdateAWGMenu()
-        time.sleep(0.05)
-        ReMakeAWGwaves()
-        cf.session.tk.END() # Add this to turn off outputs after first tiem loading a config? 
-        BTime()
-    except:
-        print( "Config File Not Found.")
-    UpdateTimeTrace()
+## Load configuration from a file, im Config File stehen zeilenwese Befehle
+## welche ausgeführt werden - Frage ob überhaupt nötig
+#def BLoadConfig(filename):
+#    # Read configuration values from file
+#    try:
+#        ConfgFile = open(filename)
+#        for line in ConfgFile:
+#            try:
+#                exec(line.rstrip())
+#            except:
+#                print( "Skipping " + line.rstrip())
+#        ConfgFile.close()
+#        UpdateAWGMenu()
+#        time.sleep(0.05)
+#        ReMakeAWGwaves()
+#        cf.session.tk.END() # Add this to turn off outputs after first tiem loading a config? 
+#        BTime()
+#    except:
+#        print( "Config File Not Found.")
+#    UpdateTimeTrace()
 
 # Function to close and exit ALICE
 def Bcloseexit():
@@ -591,7 +558,7 @@ cf.ca = tk.Canvas(frame2, width=cf.CANVASwidth, height=cf.CANVASheight, backgrou
 cf.ca.bind('<Configure>', onCAresize)
 cf.ca.bind('<1>', onCanvasClickLeft)
 cf.ca.bind('<3>', onCanvasClickRight)
-cf.ca.bind("<Motion>",onCanvasMouse_xy)
+#cf.ca.bind("<Motion>",onCanvasMouse_xy)
 cf.ca.pack(side=tk.TOP, fill=tk.BOTH, expand=tk.YES)
 cf.MouseWidget = cf.ca
 
@@ -606,7 +573,7 @@ dropmenu1.pack(side=tk.TOP)
 Filemenu = ttk.Menubutton(dropmenu1, text="File", style="W4.TButton")
 Filemenu.menu = tk.Menu(Filemenu, tearoff = 0 )
 Filemenu["menu"] = Filemenu.menu
-Filemenu.menu.add_command(label="Load Config", command=BLoadConfig)
+#Filemenu.menu.add_command(label="Load Config", command=BLoadConfig) # überhaupt nötig?
 Filemenu.menu.add_command(label="Save Screen", command=BSaveScreen)
 Filemenu.menu.add_command(label="Save To CSV", command=BSaveData)
 Filemenu.pack(side=tk.LEFT, anchor=tk.W)
@@ -614,17 +581,20 @@ Filemenu.pack(side=tk.LEFT, anchor=tk.W)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Options Menu
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-Optionmenu = ttk.Menubutton(dropmenu1, text="Options", style="W7.TButton")
+Optbut=Optionmenu = ttk.Menubutton(dropmenu1, text="Options", style="W7.TButton")
 Optionmenu.menu = tk.Menu(Optionmenu, tearoff = 0 )
 Optionmenu["menu"]  = Optionmenu.menu
-Optionmenu.menu.add_command(label='Change Settings', command=MakeSettingsMenu)
-Optionmenu.menu.add_command(label='Set Sample Rate', command=MakeSampleRateMenu)
+Optionmenu.menu.add_command(label='Settings', command=MakeSettingsMenu)
+Optionmenu.menu.add_command(label='Sample Rate', command=MakeSampleRateMenu)
 Optionmenu.menu.add_checkbutton(label='Smooth', variable=cf.SmoothCurves, command=UpdateTimeTrace)
 Optionmenu.menu.add_checkbutton(label='Z-O-Hold', variable=cf.ZOHold, command=UpdateTimeTrace)
-Optionmenu.menu.add_checkbutton(label='Trace Avg [a]', variable=cf.TRACEmodeTime)
+Optionmenu.menu.add_checkbutton(label='Trace Avg', variable=cf.TRACEmodeTime)
 Optionmenu.menu.add_radiobutton(label='Black BG', variable=cf.ColorMode, value=0, command=BgColor)
 Optionmenu.menu.add_radiobutton(label='White BG', variable=cf.ColorMode, value=1, command=BgColor)
 Optionmenu.pack(side=tk.LEFT, anchor=tk.W)
+# Tooltip für Options Button (leider keine getrennten Tooltips für Menüpunkte machbar)
+dummy=CreateToolTip(Optbut, 'Settings')
+
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Measurments und Math menu

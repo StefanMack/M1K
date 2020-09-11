@@ -16,7 +16,7 @@ Nähere Infos siehe: wiki.analog.com/university/tools/m1k
 
 In diesem Repository befinden sich Python-Programmbeispiele, die auf dem Pythonpackage pysmu (Wrapper der C-Bibliothek libsmu siehe github.com/analogdevicesinc/libsmu) von Analog Devices basieren.
 
-Weiter wurde die quelloffene Benutzeroberfläche "Alice Desktop 1.38" (https://wiki.analog.com/university/tools/m1k/alice/desk-top-users-guide) von Analog Devices vereinfacht, debugged und mit deutschsprachigen Tooltips versehen. Die Studis können mit diesem Pythonmodul "AliceLite" das M1K als "Virtuelle Instrument" auf ihren Rechnern verwenden. AliceLite wird als Teil einer WinPython-Distribution auf den PC geladen. Zusätzlich ist eine Treiberinstallation von Analog Devices nötig, welche die M1K-spezifischen Bibliotheken "libsmu" sowie "pysmu" installiert.
+Weiter wurde die quelloffene Benutzeroberfläche "Alice Desktop 1.38" (siehe wiki.analog.com/university/tools/m1k/alice/desk-top-users-guide) von Analog Devices vereinfacht, debugged und mit deutschsprachigen Tooltips versehen. Die Studis können mit diesem Pythonmodul "AliceLite" das M1K als "Virtuelle Instrument" auf ihren Rechnern verwenden. AliceLite wird als Teil einer WinPython-Distribution auf den PC geladen. Zusätzlich ist eine Treiberinstallation von Analog Devices nötig, welche die M1K-spezifischen Bibliotheken "libsmu" sowie "pysmu" installiert.
 
 
 ![Screenshot AliceLite](/alicelite_screenshot)

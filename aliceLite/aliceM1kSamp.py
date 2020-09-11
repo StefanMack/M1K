@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 7.9.20
+S. Mack, 8.9.20
 """
 import time
 import numpy as np
@@ -31,17 +31,17 @@ Alternate_Sweep_Mode = 1 # 1 wenn drei oder mehr Signale gesampelt werden
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++       
 def Analog_In():
     logging.debug("Analog_In()")
-    while (True):
+    while (cf.running):
         if (cf.RUNstatus.get() == 1) or (cf.RUNstatus.get() == 2):
             if cf.SettingsStatus.get() == 1:
                 am.UpdateSettingsMenu() # Make sure current entries in Settings controls are up to date
             Analog_Time_In()
-        cf.root.update_idletasks()
         cf.root.update()
+    logging.debug("Analog_In() exiting while loop")
 
 #---Read the analog data and store the data into the arrays
 def Analog_Time_In():
-    logging.debug("Analog_Time_In()")
+    #logging.debug("Analog_Time_In()")
     global InOffA, InGainA, InOffB, InGainB
     global CurOffA, CurOffB, CurGainA, CurGainB 
     # get time scale
@@ -508,7 +508,7 @@ def SetSampleRate():
     cf.AWGSAMPLErate = cf.BaseSampleRate
     BaseRatesb.delete(0,tk.END)
     BaseRatesb.insert(0,cf.BaseSampleRate)
-    UpdateAwgCont(0) # remake AWG waveforms for new rate
+    UpdateAwgCont() # remake AWG waveforms for new rate
     if (WasRunning == 1):
         WasRunning = 0
         BStart() # restart loop if was running

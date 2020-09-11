@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Enthält die für alle Module zugreifbaren globalen Variablen
-S. Mack, 1.9.20
+S. Mack, 8.9.20
 """
 import tkinter as tk
 import numpy as np
@@ -14,10 +14,8 @@ session = None # Zugriff auf die M1K-Session
 devx = None # Zugriff auf das M1K der Session
 CHA = CHB = None # M1K Instanzen für die beiden Kanäle A und B
 
-AWG_2X = 0 # Flag für Verdopplung Samplingrage (war vorher Checkbox)
-
 DevID = "No Device" # Seriennummer des M1K bzw. dieser String falls kein M1K angeschlossen
-
+running = 1 # wechselt auf 0, wenn exit-Button angeklickt oder Fenster geschlossen wird
 
 FontSize = 8
 GRW = 720 # Width of the time grid 720 default, X-Richtung geht nach Rechts
@@ -171,7 +169,6 @@ Two_X_Sample = tk.IntVar(0) # selection variable to set ADC channes for 2X sampl
 Two_X_Sample.set(0)
 
 ShowCur = tk.IntVar(0)
-
 
 
 RUNstatus = tk.IntVar(0) # 0 stopped, 1 start, 2 running, 3 stop now, 4 stop and restart

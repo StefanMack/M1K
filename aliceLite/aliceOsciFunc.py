@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 7.9.20
+S. Mack, 8.9.20
 """
 import math
 import time
@@ -27,7 +27,6 @@ HozPoss = 0 #
 def BStop():
     logging.debug('BStop()')
     if (cf.RUNstatus.get() == 1):
-        # print("Stoping")
         cf.RUNstatus.set(0)
         cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
         cf.CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode
@@ -35,7 +34,6 @@ def BStop():
         cf.CHB.constant(0.0)
         if cf.session.continuous:
             cf.session.end()
-
     UpdateTimeScreen()          # Always Update screens as necessary
 
 # Set Hor time scale from entry widget
@@ -164,7 +162,7 @@ def BStart():
             if not cf.session.continuous:
                 cf.session.start(0)
             time.sleep(0.02) # wait awhile here for some reason                   
-    # UpdateTimeScreen()          # Always Update
+    UpdateTimeScreen()          # Always Update
     if cf.TIMEdiv >= 100:
         First_Slow_sweep = 0
     else:
@@ -187,9 +185,11 @@ def UpdateTimeScreen():
     logging.debug('UpdateTimeScreen()')
     MakeTimeScreen() # Update the screen
     cf.MarkerNum = 0 # Marker wurden durch MakeTimeScreen() gelöscht, jetzt noch Position 1. Marker wieder zurücksetzen 
-    cf.root.update() # Activate updated screens    
-
-        
+    if cf.running == 1: # damit keine Fehlermeldung bei Exit mit laufendem Oszi
+        cf.root.update() # Activate updated screens
+        #cf.root.update_idletasks() # Wieso ist das hier nötig?
+    
+    
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Oszilloskop Tiggerfunktionen
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

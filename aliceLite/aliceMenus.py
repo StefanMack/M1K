@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 7.9.20
+S. Mack, 11.9.20
 """
 
 import tkinter as tk
@@ -51,8 +51,8 @@ class CreateToolTip(object):
     def showtip(self, event=None):
         x = y = 0
         x, y, cx, cy = self.widget.bbox("insert")
-        x += self.widget.winfo_rootx() + 25
-        y += self.widget.winfo_rooty() + 20
+        x += self.widget.winfo_rootx()  # x-Position Tooltip war + 25
+        y += self.widget.winfo_rooty() + 20 # war 20
         # creates a toplevel window
         self.tw = tk.Toplevel(self.widget)
         # Leaves only the label and removes the app window
@@ -184,19 +184,19 @@ def MakeAWGMenuInside():
     ModeAMenu.menu = tk.Menu(ModeAMenu, tearoff = 0 )
     ModeAMenu["menu"] = ModeAMenu.menu
     # 0 muss übergeben werden, da UpdateAwgCont() unten für Entrys benutzt wird, die Event übergeben
-    ModeAMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGAMode, value=0, command=UpdateAwgCont(0)) 
-    ModeAMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGAMode, value=1, command=UpdateAwgCont(0)) 
-    ModeAMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGAMode, value=2, command=UpdateAwgCont(0)) 
+    ModeAMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGAMode, value=0, command=UpdateAwgCont) 
+    ModeAMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGAMode, value=1, command=UpdateAwgCont) 
+    ModeAMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGAMode, value=2, command=UpdateAwgCont) 
     ModeAMenu.pack(side=tk.LEFT, anchor=tk.W)
     ShapeAMenu = ttk.Menubutton(cf.AWGAMenus, text="Shape", style="W6.TButton")
     ShapeAMenu.menu = tk.Menu(ShapeAMenu, tearoff = 0 )
     ShapeAMenu["menu"] = ShapeAMenu.menu
-    ShapeAMenu.menu.add_radiobutton(label="DC", variable=cf.AWGAShape, value=0, command=UpdateAwgCont(0))
-    ShapeAMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGAShape, value=1, command=UpdateAwgCont(0))
-    ShapeAMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGAShape, value=2, command=UpdateAwgCont(0))
-    ShapeAMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGAShape, value=3, command=UpdateAwgCont(0))
-    ShapeAMenu.menu.add_radiobutton(label="Square", variable=cf.AWGAShape, value=4, command=UpdateAwgCont(0))
-    ShapeAMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGAShape, value=5, command=UpdateAwgCont(0))
+    ShapeAMenu.menu.add_radiobutton(label="DC", variable=cf.AWGAShape, value=0, command=UpdateAwgCont)
+    ShapeAMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGAShape, value=1, command=UpdateAwgCont)
+    ShapeAMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGAShape, value=2, command=UpdateAwgCont)
+    ShapeAMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGAShape, value=3, command=UpdateAwgCont)
+    ShapeAMenu.menu.add_radiobutton(label="Square", variable=cf.AWGAShape, value=4, command=UpdateAwgCont)
+    ShapeAMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGAShape, value=5, command=UpdateAwgCont)
     ShapeAMenu.pack(side=tk.LEFT, anchor=tk.W)
     # AWGA: Einstellung Min-/Maxwerte
     awg1ampl = ttk.Frame(cf.AWGASet)
@@ -241,19 +241,19 @@ def MakeAWGMenuInside():
     ModeBMenu = ttk.Menubutton(cf.AWGBMenus, text="Mode", style="W5.TButton")
     ModeBMenu.menu = tk.Menu(ModeBMenu, tearoff = 0 )
     ModeBMenu["menu"] = ModeBMenu.menu
-    ModeBMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGBMode, value=0, command=UpdateAwgCont(0))
-    ModeBMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGBMode, value=1, command=UpdateAwgCont(0))
-    ModeBMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGBMode, value=2, command=UpdateAwgCont(0))
+    ModeBMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGBMode, value=0, command=UpdateAwgCont)
+    ModeBMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGBMode, value=1, command=UpdateAwgCont)
+    ModeBMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGBMode, value=2, command=UpdateAwgCont)
     ModeBMenu.pack(side=tk.LEFT, anchor=tk.W)
     ShapeBMenu = ttk.Menubutton(cf.AWGBMenus, text="Shape", style="W6.TButton")
     ShapeBMenu.menu = tk.Menu(ShapeBMenu, tearoff = 0 )
     ShapeBMenu["menu"] = ShapeBMenu.menu
-    ShapeBMenu.menu.add_radiobutton(label="DC", variable=cf.AWGBShape, value=0, command=UpdateAwgCont(0))
-    ShapeBMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGBShape, value=1, command=UpdateAwgCont(0))
-    ShapeBMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGBShape, value=2, command=UpdateAwgCont(0))
-    ShapeBMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGBShape, value=3, command=UpdateAwgCont(0))
-    ShapeBMenu.menu.add_radiobutton(label="Square", variable=cf.AWGBShape, value=4, command=UpdateAwgCont(0))
-    ShapeBMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGBShape, value=5, command=UpdateAwgCont(0))
+    ShapeBMenu.menu.add_radiobutton(label="DC", variable=cf.AWGBShape, value=0, command=UpdateAwgCont)
+    ShapeBMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGBShape, value=1, command=UpdateAwgCont)
+    ShapeBMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGBShape, value=2, command=UpdateAwgCont)
+    ShapeBMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGBShape, value=3, command=UpdateAwgCont)
+    ShapeBMenu.menu.add_radiobutton(label="Square", variable=cf.AWGBShape, value=4, command=UpdateAwgCont)
+    ShapeBMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGBShape, value=5, command=UpdateAwgCont)
     ShapeBMenu.pack(side=tk.LEFT, anchor=tk.W)
     # AWGB: Einstellung Min-/Maxwerte
     awg2ampl = ttk.Frame(cf.AWGBSet)
@@ -297,13 +297,20 @@ def MakeAWGMenuInside():
     awg2hint = ttk.Label(cf.AWGBSet, text=" at numeric inputs \n press <Return> to confirm" )
     awg2hint.pack(side=tk.TOP, pady = (10,0))  
     # Tooltips für die AWGs
-    CreateToolTip(ModeAMenu, 'Hier die Fuktion des Kanals einstellen: Nur Sampeln (Hi-Z), AWG als Spannungsquelle (SVMI) oder Stromquelle (SIMV)')
+    CreateToolTip(ModeAMenu, 'Funktion des Kanals A: Nur Sampeln (Hi-Z), AWG als Spannungsquelle (SVMI) oder Stromquelle (SIMV)')
+    CreateToolTip(ShapeAMenu, 'Kurvenform des vom AWG Kanal A zu erzeugenden Signals (nur bei SVMI oder SIMV)')
+    CreateToolTip(ModeBMenu, 'Funktion des Kanals B: Nur Sampeln (Hi-Z), AWG als Spannungsquelle (SVMI) oder Stromquelle (SIMV)')
+    CreateToolTip(ShapeBMenu, 'Kurvenform des vom AWG Kanal B zu erzeugenden Signals (nur bei SVMI oder SIMV)')
+    CreateToolTip(cf.AWGADutyCycleEntry, 'Tastverhälnis bei Auswahl Square (Rechtecksignal)')
+    CreateToolTip(cf.AWGBDutyCycleEntry, 'Tastverhälnis bei Auswahl Square (Rechtecksignal)')
+    
+
 
 def UpdateAWGMenu():
     logging.debug('UpdateAWGMenu()')
     UpdateAWGA()
     UpdateAWGB()
-    UpdateAwgCont(0)
+    UpdateAwgCont()
 #--- Ende AWG Menü im Hauptfenster
     
 #--- Samplingrate Menü im Unterfenster
@@ -340,21 +347,21 @@ def MakeSampleRateMenu():
         muxlab1.grid(row=2, column=0, sticky=tk.W)
         chabuttons = ttk.Frame(frame1)
         chabuttons.grid(row=3, column=0, sticky=tk.W)
-        muxrb1 = ttk.Radiobutton(chabuttons, text="CA-V and CB-V", variable=cf.ADC_Mux_Mode, value=0, command=m1k.SetADC_Mux ) #style="W8.TButton",
+        muxrb1 = ttk.Radiobutton(chabuttons, text="CA-V and CB-V", variable=cf.ADC_Mux_Mode, value=0, command=m1k.SetADC_Mux) #style="W8.TButton",
         muxrb1.pack(side=tk.LEFT)
-        muxrb2 = ttk.Radiobutton(chabuttons, text="CA-I and CB-I", variable=cf.ADC_Mux_Mode, value=1, command=m1k.SetADC_Mux ) #style="W8.TButton",
+        muxrb2 = ttk.Radiobutton(chabuttons, text="CA-I and CB-I", variable=cf.ADC_Mux_Mode, value=1, command=m1k.SetADC_Mux) #style="W8.TButton",
         muxrb2.pack(side=tk.LEFT)
         chcbuttons = ttk.Frame(frame1)
         chcbuttons.grid(row=4, column=0, sticky=tk.W)
-        muxrb5 = ttk.Radiobutton(chcbuttons, text="CA-V and CA-I", variable=cf.ADC_Mux_Mode, value=4, command=m1k.SetADC_Mux ) # style="W8.TButton",
+        muxrb5 = ttk.Radiobutton(chcbuttons, text="CA-V and CA-I", variable=cf.ADC_Mux_Mode, value=4, command=m1k.SetADC_Mux) # style="W8.TButton",
         muxrb5.pack(side=tk.LEFT)
-        muxrb6 = ttk.Radiobutton(chcbuttons, text="CB-V and CB-I", variable=cf.ADC_Mux_Mode, value=5, command=m1k.SetADC_Mux ) # style="W8.TButton",
+        muxrb6 = ttk.Radiobutton(chcbuttons, text="CB-V and CB-I", variable=cf.ADC_Mux_Mode, value=5, command=m1k.SetADC_Mux) # style="W8.TButton",
         muxrb6.pack(side=tk.LEFT)
         chbbuttons = ttk.Frame(frame1)
         chbbuttons.grid(row=5, column=0, sticky=tk.W)
-        muxrb3 = ttk.Radiobutton(chbbuttons, text="CA-V and CB-I", variable=cf.ADC_Mux_Mode, value=2, command=m1k.SetADC_Mux ) # style="W8.TButton",
+        muxrb3 = ttk.Radiobutton(chbbuttons, text="CA-V and CB-I", variable=cf.ADC_Mux_Mode, value=2, command=m1k.SetADC_Mux) # style="W8.TButton",
         muxrb3.pack(side=tk.LEFT)
-        muxrb4 = ttk.Radiobutton(chbbuttons, text="CB-V and CA-I", variable=cf.ADC_Mux_Mode, value=3, command=m1k.SetADC_Mux ) # style="W8.TButton",
+        muxrb4 = ttk.Radiobutton(chbbuttons, text="CB-V and CA-I", variable=cf.ADC_Mux_Mode, value=3, command=m1k.SetADC_Mux) # style="W8.TButton",
         muxrb4.pack(side=tk.LEFT)
         
         sratedismissclbutton = ttk.Button(frame1, text="Close Window", style="W12.TButton", command=DestroySampleRateMenu)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 7.9.20
+S. Mack, 8.9.20
 """
 import tkinter as tk
 import config as cf
@@ -871,7 +871,6 @@ def MakeTimeScreen():
     if vx < 1:
         txt = txt + ' {0:.2f} '.format(vx * 1000.0) + " us/div"
     # Info Horizontalposition
-    logging.debug('abs(HozPoss) = {}'.format(abs(HozPoss)))
     txt = txt + " / "
     if abs(HozPoss) >= 1000:
         txt = txt + str(int(HozPoss / 1000.0)) + " s "

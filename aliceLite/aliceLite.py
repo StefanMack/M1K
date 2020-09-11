@@ -1,21 +1,17 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-# With external module pysmu ( libsmu >= 1.0.2 for ADALM1000 )
+# With external module pysmu (libsmu >= 1.0.2 for ADALM1000)
 # Uses new firmware (2.17 or >) that support control of ADC mux configure
 # Based on Code wirtten by D Mercer ()
 # https://github.com/analogdevicesinc/alice/tree/Version-1.3
 #
-# Version 4:
-# AWG nur noch mit Basis-Signalformen und ohne doppelte Samplingrate.
-# AWG-Terminierung fest auf "open"
-# Math-Funktionen verifiziert
-# M1K Samplingfunktionen verifiziert
-# Ungenutzte globale Variable entfernt
+# Version 0.1:
+# First release Version
 # *****************************************************************************
-# Light Version alice-desctop 1.38, S. Mack, 7.9.2020
+# Light Version alice-desctop 1.38, S. Mack, 11.9.2020
 # *****************************************************************************
 
-
+import time
 import logging
 import tkinter as tk
 import tkinter.font as tkf
@@ -39,10 +35,10 @@ BTrigger50p, BTriglevel)
 
 # Nachfolgende Zeile für Debugmeldungen ausschalten (level=0 bedeutet alle Meldungen)
 # DEBUG 10, INFO 20, WARNING 30
-logging.basicConfig(level=20)
-logging.basicConfig(filename='logDatei.log', level=10)
+logging.basicConfig(level=30)
+logging.basicConfig(filename='logDatei.log', level=30)
 
-RevDate = "(7 Sep 2020)"
+RevDate = "(11 Sep 2020)"
 SWRev = "0.1 "
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
@@ -286,14 +282,13 @@ def ConSingDev():
             m1kcon.configure(text="M1K", style="RConn.TButton")
             return
         cf.session.configure(sample_rate=cf.SAMPLErate)
-        print("Session sample rate: " + str(cf.session.sample_rate))      
+        logging.debug("Session sample rate: {}".format(cf.session.sample_rate))      
         cf.devx = cf.session.devices[0] 
         cf.DevID = cf.devx.serial
         print("Device ID:" + str(cf.DevID))
         FWRevOne = float(cf.devx.fwver)
-
         HWRevOne = str(cf.devx.hwver)
-        print( FWRevOne, HWRevOne)   
+        print('Firmware Revision: {}, Hardware Revision: {}'.format(FWRevOne, HWRevOne))   
         if FWRevOne < 2.17:
             tkm.showwarning("WARNING","This ALICE version Requires Firmware version > 2.16")
         cf.CHA = cf.devx.channels['A']    # Open CHA
@@ -303,7 +298,7 @@ def ConSingDev():
         # Hier unterscheiden sich die beiden Hardware-Revisions
         cf.devx.set_adc_mux(0)
         if cf.devx.hwver == "F":
-            print( "Rev F Board I/O ports set")
+            logging.debug( "Rev F Board I/O ports set")
             PIO_0 = 28
             PIO_1 = 29
             PIO_2 = 47
@@ -313,7 +308,7 @@ def ConSingDev():
             PIO_6 = 6
             PIO_7 = 7
         else:
-            print( "Rev D Board I/O ports set")
+            logging.debug( "Rev D Board I/O ports set")
             PIO_0 = 0
             PIO_1 = 1
             PIO_2 = 2
@@ -409,24 +404,27 @@ def BSaveData():
 
 # Function to close and exit ALICE
 def Bcloseexit():
+    logging.debug('Bcloseexit() Einstieg')
+    BStop()
+    logging.debug('Bcloseexit() nach BStop()')
+    time.sleep(0.2)
     cf.RUNstatus.set(0)
-    # BSaveConfig("alice-last-config.cfg")
+    cf.running = 0 # stop Analog_in() while loop
+    logging.debug('Bcloseexit() nach cf.running = 0')
+    time.sleep(0.2)
     try:
         cf.devx.set_led(0b100) # LED auf Blau setzen
         # Put channels in Hi-Z and exit
         cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
         cf.CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z split mode
         cf.devx.set_adc_mux(0) # set ADC mux conf to default
-        cf.AWG_2X(0)
-        #BAWG2X()
         cf.CHA.constant(0.0)
         cf.CHB.constant(0.0)
     except:
         pass
     cf.root.destroy()
-    exit()
 
-def donothing():
+def donothing(): # Workaround für blaue Überschriften im Measure-Menü
     pass
 
 #==============================================================================
@@ -435,7 +433,7 @@ def donothing():
 #==============================================================================
 #==============================================================================
 cf.root.geometry('1400x800+0+0') # Größe und xy-Position Fenster beim Start
-cf.root.protocol("WM_DELETE_WINDOW", Bcloseexit)
+cf.root.protocol("WM_DELETE_WINDOW", Bcloseexit) # wenn Oszifenster geschlossen wird > Bcloseexit
 #--- Festlegung der Teilfenster
 frame1 = ttk.Frame(cf.root, borderwidth=5, relief=tk.RIDGE) # oberhalb Anzeigebereich
 frame1.pack(side=tk.TOP, fill=tk.BOTH, expand=tk.NO)
@@ -491,11 +489,11 @@ cf.HoldOffentry.insert(0,0.0)
 hint = ttk.Label(frame1, text=" at numeric inputs \n press <Return> to confirm")
 hint.pack(side=tk.LEFT, padx=(20,0))
 
-Triggermenu_tip = CreateToolTip(Triggermenu, 'Triggerquelle')
-Edgemenu_tip = CreateToolTip(Edgemenu, 'Triggerflanke')
-Triglevel_tip = CreateToolTip(cf.TRIGGERentry, 'Triggerschwelle')
+Triggermenu_tip = CreateToolTip(Triggermenu, 'Trigger aktivieren, Triggerquelle und Triggermodus')
+Edgemenu_tip = CreateToolTip(Edgemenu, 'Triggern auf steigende oder fallende Flanke')
+Triglevel_tip = CreateToolTip(cf.TRIGGERentry, 'Triggerschwelle in V bzw. mA')
 tgb_tip = CreateToolTip(tgb, 'Triggerschwelle auf 50 % setzen')
-hldlab_tip = CreateToolTip(hldlab, 'Increment Hold Off setting by one time division')
+hldlab_tip = CreateToolTip(cf.HoldOffentry, 'Totzeit in ms nach Triggerereignis bevor erneut getriggert werden kann')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Oszistatus Menü
@@ -511,8 +509,8 @@ m1kcon = ttk.Button(frame1, text="M1K", style="RConn.TButton", command=ConSingDe
 m1kcon.pack(side=tk.RIGHT)
 
 bexit_tip = CreateToolTip(bexit, 'Anwendung schließen')
-bstop_tip = CreateToolTip(bstop, 'Stop Datenaufnahme')
-brun_tip = CreateToolTip(brun, 'Start Datenaufnahme')
+bstop_tip = CreateToolTip(bstop, 'Stop Datenaufnahme, Signalerzeugung und Aktualisierung Darstellung')
+brun_tip = CreateToolTip(brun, 'Start Datenaufnahme, Signalerzeugung und Aktualisierung Darstellung')
 m1kcon_tip = CreateToolTip(m1kcon, 'M1K verbinden oder trennen, Grün = M1K verbunden')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -527,6 +525,7 @@ Cursormenu.menu.add_radiobutton(label='CA-I Cursor', background=cf.COLORtrace3, 
 Cursormenu.menu.add_radiobutton(label='CB-V Cursor', background=cf.COLORtrace2, value = 2, variable=cf.ShowCur, command=UpdateTimeTrace)
 Cursormenu.menu.add_radiobutton(label='CB-I Cursor', background=cf.COLORtrace4, value = 4, variable=cf.ShowCur, command=UpdateTimeTrace)
 Cursormenu.pack(side=tk.RIGHT, padx=(0,16))
+cursor_tip = CreateToolTip(Cursormenu, 'xy-Cursor einschalten und auswählen welcher dargestellter Signalverlauf damit vermessen wird')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Horizontal Menü: Time per Div
@@ -536,7 +535,7 @@ cf.TMsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.TMsb.pack(side=tk.RIGHT, padx=(0,16))
 cf.TMsb.delete(0,tk.END)
 cf.TMsb.insert(0,0.5)
-cf.TMlab = ttk.Label(frame1, text="Time ms/Div:")
+cf.TMlab = ttk.Label(frame1, text="Horz Scale ms/Div:")
 cf.TMlab.pack(side=tk.RIGHT)
 
 cf.HozPossentry = tk.Entry(frame1, width=4)
@@ -547,7 +546,8 @@ cf.HozPossentry.insert(0,0.0)
 hozlab = ttk.Label(frame1, text="Horz Pos (ms):")
 hozlab.pack(side=tk.RIGHT)
 
-hozlab_tip = CreateToolTip(hozlab, 'When triggering, set trigger point to center of screen')
+hozlab_tip = CreateToolTip(cf.HozPossentry, 'Position des Triggerzeitpunkts in der Darstellung - negative Werte zeigen Signal vor dem Triggerzeitpunkt, dazu zuerst Zahl und dann Minuszeichen eingeben)')
+time_tip = CreateToolTip(cf.TMsb, 'Horizontale Skalierung = Zeitbasis: Zeitabstand zwischen Gitterlinien (Div)')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Anzeigebereich für Traces
@@ -578,6 +578,8 @@ Filemenu.menu.add_command(label="Save Screen", command=BSaveScreen)
 Filemenu.menu.add_command(label="Save To CSV", command=BSaveData)
 Filemenu.pack(side=tk.LEFT, anchor=tk.W)
 
+file_tip = CreateToolTip(Filemenu, 'Speichern des Oszillkopbilds oder des Signalverlaufs')
+
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Options Menu
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -593,7 +595,7 @@ Optionmenu.menu.add_radiobutton(label='Black BG', variable=cf.ColorMode, value=0
 Optionmenu.menu.add_radiobutton(label='White BG', variable=cf.ColorMode, value=1, command=BgColor)
 Optionmenu.pack(side=tk.LEFT, anchor=tk.W)
 # Tooltip für Options Button (leider keine getrennten Tooltips für Menüpunkte machbar)
-dummy=CreateToolTip(Optbut, 'Settings')
+opt_tip=CreateToolTip(Optbut, 'Einstellungen, Abtastrate, Darstellungsformen, Mittelung')
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -651,7 +653,9 @@ MeasmenuB.pack(side=tk.LEFT)
 mathbt = ttk.Button(dropmenu2, text="Math", style="Math.TButton", command = MakeMathMenu)
 mathbt.pack(side=tk.RIGHT, anchor=tk.W)
 
-math_tip = CreateToolTip(mathbt, 'Open Math window')
+measA_tip=CreateToolTip(MeasmenuA, 'Messfunktionen wie Mittelwert, RMS für Kanal A')
+measB_tip=CreateToolTip(MeasmenuB, 'Messfunktionen wie Mittelwert, RMS für Kanal B')
+math_tip = CreateToolTip(mathbt, 'Mathematikfunktionen auf Signalverläufe')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Menü zur Anzeige der Traces
@@ -668,24 +672,25 @@ ckbt3 = ttk.Checkbutton(curvecheckb, text='CB-V', style="Strace2.TCheckbutton", 
 ckbt3.grid(row=1, column=0)
 ckbt4 = ttk.Checkbutton(curvecheckb, text='CB-I', style="Strace4.TCheckbutton", variable=cf.ShowC2_I, command=TraceSelectADC_Mux)
 ckbt4.grid(row=1, column=1)
+actCh_tip = CreateToolTip(curvelab, 'Auswahl der dargestellten Signalverläufe')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Gain-/Offsetkorrektur für V und I der beiden Kanäle (Fenster rechts)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-prlab = ttk.Label(frame2r, text="Adjust Gain / Offset")
+prlab = ttk.Label(frame2r, text="Calibrate Gain / Offset")
 prlab.pack(side=tk.TOP, pady=(8,0))
 ProbeA = ttk.Frame(frame2r)
 ProbeA.pack(side=tk.TOP)
 gain1lab = ttk.Label(ProbeA, text="CA-V")
 gain1lab.pack(side=tk.LEFT)
 
-cf.CHAVGainEntry = tk.Entry(ProbeA, width=5)
+cf.CHAVGainEntry = tk.Entry(ProbeA, width=6)
 cf.CHAVGainEntry.bind('<Return>', onTextKey)
 cf.CHAVGainEntry.pack(side=tk.LEFT)
 cf.CHAVGainEntry.delete(0,tk.END)
 cf.CHAVGainEntry.insert(0,1.0)
 
-cf.CHAVOffsetEntry = tk.Entry(ProbeA, width=5)
+cf.CHAVOffsetEntry = tk.Entry(ProbeA, width=6)
 cf.CHAVOffsetEntry.bind('<Return>', onTextKey)
 cf.CHAVOffsetEntry.pack(side=tk.LEFT)
 cf.CHAVOffsetEntry.delete(0,tk.END)
@@ -696,13 +701,13 @@ ProbeB.pack(side=tk.TOP)
 gain2lab = ttk.Label(ProbeB, text="CB-V")
 gain2lab.pack(side=tk.LEFT)
 
-cf.CHBVGainEntry = tk.Entry(ProbeB, width=5)
+cf.CHBVGainEntry = tk.Entry(ProbeB, width=6)
 cf.CHBVGainEntry.bind('<Return>', onTextKey)
 cf.CHBVGainEntry.pack(side=tk.LEFT)
 cf.CHBVGainEntry.delete(0,tk.END)
 cf.CHBVGainEntry.insert(0,1.0)
 
-cf.CHBVOffsetEntry = tk.Entry(ProbeB, width=5)
+cf.CHBVOffsetEntry = tk.Entry(ProbeB, width=6)
 cf.CHBVOffsetEntry.bind('<Return>', onTextKey)
 cf.CHBVOffsetEntry.pack(side=tk.LEFT)
 cf.CHBVOffsetEntry.delete(0,tk.END)
@@ -713,13 +718,13 @@ ProbeAI.pack(side=tk.TOP)
 gainailab = ttk.Label(ProbeAI, text="CA-I")
 gainailab.pack(side=tk.LEFT)
 
-cf.CHAIGainEntry = tk.Entry(ProbeAI, width=5)
+cf.CHAIGainEntry = tk.Entry(ProbeAI, width=6)
 cf.CHAIGainEntry.bind('<Return>', onTextKey)
 cf.CHAIGainEntry.pack(side=tk.LEFT)
 cf.CHAIGainEntry.delete(0,tk.END)
 cf.CHAIGainEntry.insert(0,1.0)
 
-cf.CHAIOffsetEntry = tk.Entry(ProbeAI, width=5)
+cf.CHAIOffsetEntry = tk.Entry(ProbeAI, width=6)
 cf.CHAIOffsetEntry.bind('<Return>', onTextKey)
 cf.CHAIOffsetEntry.pack(side=tk.LEFT)
 cf.CHAIOffsetEntry.delete(0,tk.END)
@@ -730,18 +735,19 @@ ProbeBI.pack(side=tk.TOP)
 gainbilab = ttk.Label(ProbeBI, text="CB-I")
 gainbilab.pack(side=tk.LEFT)
 
-cf.CHBIGainEntry = tk.Entry(ProbeBI, width=5)
+cf.CHBIGainEntry = tk.Entry(ProbeBI, width=6)
 cf.CHBIGainEntry.bind('<Return>', onTextKey)
 cf.CHBIGainEntry.pack(side=tk.LEFT)
 cf.CHBIGainEntry.delete(0,tk.END)
 cf.CHBIGainEntry.insert(0,1.0)
 
-cf.CHBIOffsetEntry = tk.Entry(ProbeBI, width=5)
+cf.CHBIOffsetEntry = tk.Entry(ProbeBI, width=6)
 cf.CHBIOffsetEntry.bind('<Return>', onTextKey)
 cf.CHBIOffsetEntry.pack(side=tk.LEFT)
 cf.CHBIOffsetEntry.delete(0,tk.END)
 cf.CHBIOffsetEntry.insert(0,0.0)
 
+probe_tip = CreateToolTip(prlab, 'Korrektur von Gain- und Offsetfehler der vier Messkanäle zum Kalibrieren')
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # AWG Menü
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -768,7 +774,7 @@ MakeAWGMenuInside()
 # Voltage channel A: Verschiedene V/Div - Werte siehe CHvpdiv
 CHAlab = ttk.Label(frame3, text="CA V/Div:", background=cf.COLORtrace1)
 CHAlab.pack(side=tk.LEFT)
-cf.CHAsb = tk.Spinbox(frame3, width=4, values=CHvpdiv, command=BCHAlevel)
+cf.CHAsb = tk.Spinbox(frame3, width=5, values=CHvpdiv, command=BCHAlevel)
 cf.CHAsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHAsb.pack(side=tk.LEFT)
 cf.CHAsb.delete(0,tk.END)
@@ -782,7 +788,7 @@ cf.CHAVPosEntry.delete(0,tk.END)
 cf.CHAVPosEntry.insert(0,2.5)
 
 # Current channel A: Verschiedene A/Div - Werte siehe CHipdiv
-cf.CHAIsb = tk.Spinbox(frame3, width=4, values=CHipdiv, command=BCHAIlevel)
+cf.CHAIsb = tk.Spinbox(frame3, width=5, values=CHipdiv, command=BCHAIlevel)
 cf.CHAIsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHAIsb.pack(side=tk.LEFT)
 cf.CHAIsb.delete(0,tk.END)
@@ -798,7 +804,7 @@ CHAIofflab = ttk.Label(frame3, text="CA-I Pos", background=cf.COLORtrace3)
 CHAIofflab.pack(side=tk.LEFT, padx=(0,8))
 
 # Voltage channel B:
-cf.CHBsb = tk.Spinbox(frame3, width=4, values=CHvpdiv, command=BCHBlevel)
+cf.CHBsb = tk.Spinbox(frame3, width=5, values=CHvpdiv, command=BCHBlevel)
 cf.CHBsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHBsb.pack(side=tk.LEFT)
 cf.CHBsb.delete(0,tk.END)
@@ -814,7 +820,7 @@ CHBofflab = ttk.Label(frame3, text="CB-V Pos", background=cf.COLORtrace2)
 CHBofflab.pack(side=tk.LEFT, padx=(0,8))
 
 # Current channel B:
-cf.CHBIsb = tk.Spinbox(frame3, width=4, values=CHipdiv, command=BCHBIlevel)
+cf.CHBIsb = tk.Spinbox(frame3, width=5, values=CHipdiv, command=BCHBIlevel)
 cf.CHBIsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHBIsb.pack(side=tk.LEFT)
 cf.CHBIsb.delete(0,tk.END)
@@ -829,21 +835,30 @@ cf.CHBIPosEntry.insert(0,0.0)
 CHBIofflab = ttk.Label(frame3, text="CB-I Pos", background=cf.COLORtrace4)
 CHBIofflab.pack(side=tk.LEFT)
 
+mathInfolab = ttk.Label(frame3, text="Math traces refer to CA scales")
+mathInfolab.pack(side=tk.LEFT, padx=(8,0))
+
 # Tooltips für die Vertikaleinstellungen zu Channel A und B
-CHAlab_tip = CreateToolTip(CHAlab, 'Select CHA-V vertical range/position axis to be used for markers and drawn color')
-CHBlab_tip = CreateToolTip(CHBlab, 'Select CHB-V vertical range/position axis to be used for markers and drawn color')
-CHAIlab_tip = CreateToolTip(CHAIlab, 'Select CHA-I vertical range/position axis to be used for markers and drawn color')
-CHBIlab_tip = CreateToolTip(CHBIlab, 'Select CHB-I vertical range/position axis to be used for markers and drawn color')
-CHAofflab_tip = CreateToolTip(CHAofflab, 'Set CHA-V position to DC average of signal')
-CHBofflab_tip = CreateToolTip(CHBofflab, 'Set CHB-V position to DC average of signal')
-CHAIofflab_tip = CreateToolTip(CHAIofflab, 'Set CHA-I position to DC average of signal')
-CHBIofflab_tip = CreateToolTip(CHBIofflab, 'Set CHB-I position to DC average of signal')
+CHAlab_tip = CreateToolTip(cf.CHAsb, 'Vertikalskalierung Kanal A Spannung (CA-V) (und Math) in V/Div')
+CHBlab_tip = CreateToolTip(cf.CHBsb, 'Vertikalskalierung Kanal B Spannung (CB-V) in V/Div')
+CHAIlab_tip = CreateToolTip(cf.CHAIsb, 'Vertikalskalierung Kanal A Strom (CA-I) (und Math) in mA/Div')
+CHBIlab_tip = CreateToolTip(cf.CHBIsb, 'Vertikalskalierung in mA/Div Kanal B Strom (CA-I)')
+CHAofflab_tip = CreateToolTip(cf.CHAVPosEntry, 'Höhe der Nulllinie Kanal A Spannung (CA-V) (und Math) in V ')
+CHBofflab_tip = CreateToolTip(cf.CHBVPosEntry, 'Höhe der Nulllinie Kanal B Spannung (CB-V) in V')
+CHAIofflab_tip = CreateToolTip(cf.CHAIPosEntry, 'Höhe der Nulllinie Kanal A Strom (CA-I) (und Math) in mA')
+CHBIofflab_tip = CreateToolTip(cf.CHBIPosEntry, 'Höhe der Nulllinie Kanal B Strom (CB-I) in mA')
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Hauptroutine
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# =============================================================================
+# Seltsam, dass es hier keinen mainloop() Befehl gibt. Statdessen wird mit dem
+# Aufruf von AnalogIn() eine While-Schleife gestartet, in der zyklisch root.update()
+# aufgerufen wird.
+# =============================================================================
 ConSingDev() # Connect a single (only one connected) M1K device
 #BLoadConfig("default-config.cfg") # load default configuration
+logging.debug('Vor root.update() in der Hauptroutine')
 cf.root.update() # Activate updated screens  
 Analog_In() # Start sampling

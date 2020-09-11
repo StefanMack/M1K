@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 7.9.20
+S. Mack, 8.9.20
 
 AWGXMaxvalue war vormals AWGXOffsetvalue
 AWGXMinvalue war vormals AWGXAmplvalue
@@ -24,7 +24,7 @@ import tkinter as tk
 #    UpdateAwgCont()
 #    time.sleep(0.05)
 
-def UpdateAwgCont(dummy):
+def UpdateAwgCont(*dummy): # * damit mit und ohne Übergabe von Argumenten (z.B. Event)
     logging.debug('UpdateAwgCont()')
     # if running and in continuous streaming mode temp stop, flush buffer and restart to change AWG settings
     if (cf.RUNstatus.get() == 1):
@@ -37,7 +37,7 @@ def UpdateAwgCont(dummy):
 
 def UpdateAwgContRet():
     logging.debug('UpdateAwgContRet()')
-    UpdateAwgCont(0)
+    UpdateAwgCont()
     
 def BAWGEnab():
     logging.debug('BAWGEnab()')
@@ -135,16 +135,10 @@ def BAWGAFreq():
     except:
         cf.AWGAFreqEntry.delete(0,tk.END)
         cf.AWGAFreqEntry.insert(0, AWGAFreqvalue)
-    if cf.AWG_2X == 1:
-        if AWGAFreqvalue > 50000: # max freq is 50KHz
-            AWGAFreqvalue = 50000
-            cf.AWGAFreqEntry.delete(0,tk.END)
-            cf.AWGAFreqEntry.insert(0, AWGAFreqvalue)
-    else:
-        if AWGAFreqvalue > 25000: # max freq is 25KHz
-            AWGAFreqvalue = 25000
-            cf.AWGAFreqEntry.delete(0,tk.END)
-            cf.AWGAFreqEntry.insert(0, AWGAFreqvalue)
+    if AWGAFreqvalue > 25000: # max freq is 25KHz
+        AWGAFreqvalue = 25000
+        cf.AWGAFreqEntry.delete(0,tk.END)
+        cf.AWGAFreqEntry.insert(0, AWGAFreqvalue)
     if AWGAFreqvalue < 0: # Set negative frequency entry to 0
         AWGAFreqvalue = 10
         cf.AWGAFreqEntry.delete(0,tk.END)
@@ -315,16 +309,11 @@ def BAWGBFreq():
     except:
         cf.AWGBFreqEntry.delete(0,tk.END)
         cf.AWGBFreqEntry.insert(0, AWGBFreqvalue)
-    if cf.AWG_2X == 2:
-        if AWGBFreqvalue > 50000: # max freq is 50KHz
-            AWGBFreqvalue = 50000
-            cf.AWGBFreqEntry.delete(0,tk.END)
-            cf.AWGBFreqEntry.insert(0, AWGBFreqvalue)
-    else:
-        if AWGBFreqvalue > 25000: # max freq is 25KHz
-            AWGBFreqvalue = 25000
-            cf.AWGBFreqEntry.delete(0,tk.END)
-            cf.AWGBFreqEntry.insert(0, AWGBFreqvalue)
+
+    if AWGBFreqvalue > 25000: # max freq is 25KHz
+        AWGBFreqvalue = 25000
+        cf.AWGBFreqEntry.delete(0,tk.END)
+        cf.AWGBFreqEntry.insert(0, AWGBFreqvalue)
     if AWGBFreqvalue < 0: # Set negative frequency entry to 0
         AWGBFreqvalue = 10
         cf.AWGBFreqEntry.delete(0,tk.END)

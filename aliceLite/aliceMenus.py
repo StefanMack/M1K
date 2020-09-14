@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 11.9.20
+S. Mack, 13.9.20
 """
 
 import tkinter as tk
 import tkinter.ttk as ttk # nötig für Widget Styles
-import tkinter.messagebox as tkm
 import platform
-import aliceM1kSamp as m1k
 from aliceAwgFunc import UpdateAwgCont
 from aliceAwgFunc import UpdateAWGA
 from aliceAwgFunc import UpdateAWGB
@@ -105,15 +103,7 @@ SampleRatewindow = None
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #Tkinter Callback-Funktionen
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-def onSpinBoxScroll(event): # Spin Boxes do this automatically in Python 3 apparently
-    logging.debug('onSpinBoxScroll()')
-    spbox = event.widget
-    if event.delta > 0: # increment digit
-        spbox.invoke('buttonup')
-    else: # decrement digit
-        spbox.invoke('buttondown')
-
-# Use Arriw keys to inc dec entry values
+# Use Arrow keys to inc dec entry values
 def onTextKey(event):
     logging.debug('onTextKey()')
     button = event.widget
@@ -160,17 +150,7 @@ def onTextKey(event):
 def onSettingsTextKey(event):
     logging.debug('onSettingsTextKey()')
     onTextKey(event)
-    UpdateSettingsMenu()  
-    
-def onSrateScroll(event): # Samplingrateeinstellung
-    logging.debug('onSrateScroll()')
-    onSpinBoxScroll(event)
-    m1k.SetSampleRate()
-
-def onRetSrate(event): # <return> bei Samplingrateeinstellung
-    logging.debug('onRetSrate()')
-    m1k.SetSampleRate()
-    
+    UpdateSettingsMenu()        
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Tkinter UI Menüs aufbauen
@@ -294,7 +274,7 @@ def MakeAWGMenuInside():
     cf.AWGBDutyCycleEntry.insert(0,50)
     duty2lab = ttk.Label(awg2dc, text="Duty Cycle (%)")
     duty2lab.pack(side=tk.LEFT, anchor=tk.W)
-    awg2hint = ttk.Label(cf.AWGBSet, text=" at numeric inputs \n press <Return> to confirm" )
+    awg2hint = ttk.Label(cf.AWGBSet, text="press <Return> to confirm" )
     awg2hint.pack(side=tk.TOP, pady = (10,0))  
     # Tooltips für die AWGs
     CreateToolTip(ModeAMenu, 'Funktion des Kanals A: Nur Sampeln (Hi-Z), AWG als Spannungsquelle (SVMI) oder Stromquelle (SIMV)')
@@ -304,78 +284,13 @@ def MakeAWGMenuInside():
     CreateToolTip(cf.AWGADutyCycleEntry, 'Tastverhälnis bei Auswahl Square (Rechtecksignal)')
     CreateToolTip(cf.AWGBDutyCycleEntry, 'Tastverhälnis bei Auswahl Square (Rechtecksignal)')
     
-
-
 def UpdateAWGMenu():
     logging.debug('UpdateAWGMenu()')
     UpdateAWGA()
     UpdateAWGB()
     UpdateAwgCont()
 #--- Ende AWG Menü im Hauptfenster
-    
-#--- Samplingrate Menü im Unterfenster
-def MakeSampleRateMenu():
-    logging.debug('MakeSampleRateMenu()')
-    global SampleRatewindow, SampleRateStatus, BaseRatesb
-    if (SampleRateStatus.get() == 0 and cf.DevID != "No Device"):
-        SampleRateStatus.set(1)
-        SampleRatewindow = tk.Toplevel()
-        SampleRatewindow.title("Set Sample Rate ")
-        SampleRatewindow.resizable(False,False)
-        SampleRatewindow.protocol("WM_DELETE_WINDOW", DestroySampleRateMenu)
-        frame1 = ttk.Frame(SampleRatewindow, borderwidth=5, relief=tk.RIDGE)
-        frame1.grid(row=0, column=0, sticky=tk.W)
- 
-        BaseRATE = ttk.Frame(frame1)
-        BaseRATE.grid(row=0, column=0, sticky=tk.W)
-        baseratelab = ttk.Label(BaseRATE, text="Base Sample Rate", style="A10B.TLabel") #, font = "Arial 10 bold")
-        baseratelab.pack(side=tk.LEFT)
-        BaseRatesb = tk.Spinbox(BaseRATE, width=6, values=cf.SampRateList, command=m1k.SetSampleRate)
-        BaseRatesb.bind('<MouseWheel>', onSrateScroll)
-        BaseRatesb.bind("<Button-4>", onSrateScroll)# with Linux OS
-        BaseRatesb.bind("<Button-5>", onSrateScroll)
-        BaseRatesb.bind("<Return>", onRetSrate)
-        BaseRatesb.pack(side=tk.LEFT)
-        BaseRatesb.delete(0,tk.END)
-        BaseRatesb.insert(0,cf.BaseSampleRate)
-       
-        twoX = ttk.Checkbutton(frame1, text="2x Sample Rate", variable=cf.Two_X_Sample, command=m1k.SetADC_Mux)
-        twoX.grid(row=1, column=0, sticky=tk.W)
-        # Hier wird der ADC_Mux_Mode eingestellt, je nachdem welche Knöpfe (VA, VB, IA, IB) vom Benutzer aktiviert sind.
-        # Wegen der 2x Abtastrate kommen nur Zweierkombinationen in Frage. TraceSelectADC_Mux() macht eigentlich das Gleiche
-        muxlab1 = ttk.Label(frame1, text="Chose CHs for 2x", style="A10B.TLabel") #, font = "Arial 10 bold")
-        muxlab1.grid(row=2, column=0, sticky=tk.W)
-        chabuttons = ttk.Frame(frame1)
-        chabuttons.grid(row=3, column=0, sticky=tk.W)
-        muxrb1 = ttk.Radiobutton(chabuttons, text="CA-V and CB-V", variable=cf.ADC_Mux_Mode, value=0, command=m1k.SetADC_Mux) #style="W8.TButton",
-        muxrb1.pack(side=tk.LEFT)
-        muxrb2 = ttk.Radiobutton(chabuttons, text="CA-I and CB-I", variable=cf.ADC_Mux_Mode, value=1, command=m1k.SetADC_Mux) #style="W8.TButton",
-        muxrb2.pack(side=tk.LEFT)
-        chcbuttons = ttk.Frame(frame1)
-        chcbuttons.grid(row=4, column=0, sticky=tk.W)
-        muxrb5 = ttk.Radiobutton(chcbuttons, text="CA-V and CA-I", variable=cf.ADC_Mux_Mode, value=4, command=m1k.SetADC_Mux) # style="W8.TButton",
-        muxrb5.pack(side=tk.LEFT)
-        muxrb6 = ttk.Radiobutton(chcbuttons, text="CB-V and CB-I", variable=cf.ADC_Mux_Mode, value=5, command=m1k.SetADC_Mux) # style="W8.TButton",
-        muxrb6.pack(side=tk.LEFT)
-        chbbuttons = ttk.Frame(frame1)
-        chbbuttons.grid(row=5, column=0, sticky=tk.W)
-        muxrb3 = ttk.Radiobutton(chbbuttons, text="CA-V and CB-I", variable=cf.ADC_Mux_Mode, value=2, command=m1k.SetADC_Mux) # style="W8.TButton",
-        muxrb3.pack(side=tk.LEFT)
-        muxrb4 = ttk.Radiobutton(chbbuttons, text="CB-V and CA-I", variable=cf.ADC_Mux_Mode, value=3, command=m1k.SetADC_Mux) # style="W8.TButton",
-        muxrb4.pack(side=tk.LEFT)
-        
-        sratedismissclbutton = ttk.Button(frame1, text="Close Window", style="W12.TButton", command=DestroySampleRateMenu)
-        sratedismissclbutton.grid(row=6, column=0, sticky=tk.W, pady=7)
-    else:
-        tkm.showwarning("WARNING","No Device Plugged In!")
-        return 
 
-def DestroySampleRateMenu():
-    logging.debug('DestroySampleRateMenu()')
-    global SampleRatewindow, SampleRateStatus   
-    SampleRateStatus.set(0)
-    SampleRatewindow.destroy()
-#--- Ende Samplingrate Menü im Unterfenster
 
 #--- Settings Menü im Unterfenster
 def MakeSettingsMenu():

@@ -5,10 +5,10 @@
 # Based on Code wirtten by D Mercer ()
 # https://github.com/analogdevicesinc/alice/tree/Version-1.3
 #
-# Version 0.1:
-# First release Version
+# Version 0.2:
+# second release version
 # *****************************************************************************
-# Light Version alice-desctop 1.38, S. Mack, 11.9.2020
+# Light Version alice-desctop 1.38, S. Mack, 15.9.2020
 # *****************************************************************************
 
 import time
@@ -23,10 +23,10 @@ import pysmu as smu # auskommentiert, wenn kein M1K angeschlossen
 import config as cf # hier stehen alle ehemaligen globalen Variablen drin
 from aliceIcons import hipulse, lowpulse, TBicon # Bilddateien der Icons
 # Thinter UI Menüs
-from aliceMenus import (MakeSampleRateMenu, onSpinBoxScroll,
-MakeSettingsMenu, MakeMathMenu, CreateToolTip, onTextKey, MakeAWGMenuInside)
+from aliceMenus import MakeSettingsMenu, MakeMathMenu, CreateToolTip, onTextKey, MakeAWGMenuInside
 # Samplingfunktionen des M1K
-from aliceM1kSamp import TraceSelectADC_Mux, Analog_In
+import aliceM1kSamp as m1k
+#from aliceM1kSamp import TraceSelectADC_Mux, Analog_In
 # Oszillsokopfunktionen
 from aliceOsciFunc import (BStop, BTime, BHozPoss, BCHAlevel,
 BCHAIlevel, BCHBlevel, BCHBIlevel, BOffsetA, BIOffsetA, BOffsetB, BIOffsetB,
@@ -38,8 +38,8 @@ BTrigger50p, BTriglevel)
 logging.basicConfig(level=30)
 logging.basicConfig(filename='logDatei.log', level=30)
 
-RevDate = "(11 Sep 2020)"
-SWRev = "0.1 "
+RevDate = "(12 Sep 2020)"
+SWRev = "0.2 "
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
 CHvpdiv = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
@@ -213,19 +213,14 @@ def onCanvasClickLeft(event):
         if Tpoint < 1:
             axis_value = Tpoint * 1000.0
             TString = ' {0:.2f} '.format(axis_value) + " uS "
-        # TString = ' {0:.2f} '.format(Tpoint)
         yvolts = ((event.y-c1)/Yconv1) - Yoffset1
-        if cf.MarkerScale.get() == 1 or cf.MarkerScale.get() == 2:
-            V1String = ' {0:.3f} '.format(-yvolts)
-        else:
-            V1String = ' {0:.1f} '.format(-yvolts)
+        V1String = ' {0:.3f} '.format(-yvolts)
+
         V_label = str(cf.MarkerNum) + " " + TString + V1String
         V_label = V_label + Units
         if cf.MarkerNum > 1:
-            if cf.MarkerScale.get() == 1 or cf.MarkerScale.get() == 2:
-                DeltaV = ' {0:.3f} '.format(PrevV-yvolts)
-            else:
-                DeltaV = ' {0:.1f} '.format(PrevV-yvolts)
+            DeltaV = ' {0:.3f} '.format(PrevV-yvolts)
+
             DT = (Tpoint-PrevT)
             if Tpoint >= 1000:
                 axis_value = DT / 1000.0
@@ -260,18 +255,33 @@ def onCAresize(event):
     cf.GRH = cf.CANVASheight - (cf.Y0T + (cf.FontSize * 10))   # new grid height, 10 Fontgrößen Raum für Darstellungen Messwerte u.A.
     UpdateTimeAll()
 
+def onSpinBoxScroll(event): # Spin Boxes do this automatically in Python 3 apparently
+    logging.debug('onSpinBoxScroll()')
+    spbox = event.widget
+    if event.delta > 0: # increment digit
+        spbox.invoke('buttonup')
+    else: # decrement digit
+        spbox.invoke('buttondown')
+
+def onSrateScroll(event): # Samplingrateeinstellung
+    logging.debug('onSrateScroll()')
+    onSpinBoxScroll(event)
+    m1k.SetSampleRate()
+    
+def onRetSrate(event): # <return> bei Samplingrateeinstellung
+    logging.debug('onRetSrate()')
+    m1k.SetSampleRate()
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # M1K Spezifisches
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#DevID = "No Device" # Initialisierung
 
 def ConSingDev():
     logging.debug('ConSingDev()')
     global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
     if cf.DevID == "No Device":
         try:
-            cf.session = smu.Session(ignore_dataflow=True, sample_rate=cf.SAMPLErate, queue_size=cf.MaxSamples)
+            cf.session = smu.Session(ignore_dataflow=True, sample_rate=cf.SampRate, queue_size=cf.MaxSamples)
         except:
             tkm.showwarning("WARNING", "M1K buisy - please reconnect USB and press the red M1K-Connect Button.")
             return
@@ -281,7 +291,7 @@ def ConSingDev():
             FWRevOne = 0.0
             m1kcon.configure(text="M1K", style="RConn.TButton")
             return
-        cf.session.configure(sample_rate=cf.SAMPLErate)
+        cf.session.configure(sample_rate=cf.SampRate)
         logging.debug("Session sample rate: {}".format(cf.session.sample_rate))      
         cf.devx = cf.session.devices[0] 
         cf.DevID = cf.devx.serial
@@ -322,7 +332,7 @@ def ConSingDev():
         cf.devx.ctrl_transfer(0x40, 0x25, 0x1, 0, 0, 0, 100) # set not addr DAC B
         try:
             cf.session.start(0) # Start kontinuierlicher Modus des M1K
-            cf.devx.set_led(0b010) # set LED.green
+            cf.devx.set_led(0b010) # set LED.green ToDo: Unterscheidung Rev D/F
             m1kcon.configure(text="M1K", style="GConn.TButton")
         except:
             tkm.showwarning("WARNING", "M1K could not be connected.")
@@ -340,67 +350,42 @@ def BgColor():
         cf.COLORtraceR4 = "#606000"   # 25% yellow
         COLORcanvas = "#ffffff"     # 100% white
     else:
-        COLORcanvas = "#000000"   # 100% black
-        cf.COLORtrace4 = "#ffff00" # 100% yellow
-        cf.COLORtraceR4 = "#808000"   # 50% yellow
         cf.COLORtext = "#ffffff"     # 100% white
+        cf.COLORtrace4 = "#ffff00" # 100% yellow
+        cf.COLORtraceR4 = "#808000"   # 50% yellow        
+        COLORcanvas = "#000000"   # 100% black
     cf.ca.config(background=COLORcanvas)
     UpdateTimeScreen()
 
-# Save scope cf.canvas as encapsulated postscript file
-# To do: in PNG ändern
+# Screenshot des Oszibilds als eps-Grafik speichern (Konvertierung via PIL in PNG ergibt eine
+# zu grobe Auflösung, besser extern konvertieren). Weiße Links-Klick-Marker verschwinden bei ColorMode 0
 def BSaveScreen():
-    # ask for file name
     filename = asksaveasfilename(defaultextension = ".eps", filetypes=[("Encapsulated Postscript", "*.eps")])
-    Orient = tkm.askyesno("Rotation","Save in Landscape (Yes) or Portrait (No):\n")
-    if cf.MarkerNum > 0 or cf.ColorMode.get() > 0:
-        cf.ca.postscript(file=filename, height=cf.CANVASheight, width=cf.CANVASwidth, colormode='color', rotate=Orient)
-    else:    # temp chnage text corlor to black
-        cf.COLORtext = "#000000"
+    logging.debug('BSaveScreen() with filename={}, ColorMode={}'.format(filename,cf.ColorMode.get()))
+    if cf.ColorMode.get() > 0: # falls weißer Hintergrund Oszibild gewählt 
+        logging.debug('no color change')
+        cf.ca.postscript(file=filename, height=cf.CANVASheight, width=cf.CANVASwidth, colormode='color', rotate=1)
+    else: # falls schwarzer Hintegrund, zum Speichern temporär auf Weiß wechseln, Marker gehen verloren
+        logging.debug('intermediate color change to white background')
+        cf.ColorMode.set(1)
+        BgColor()
         UpdateTimeScreen()
-        # first save postscript file
-        cf.ca.postscript(file=filename, height=cf.CANVASheight, width=cf.CANVASwidth, colormode='color', rotate=Orient)
-        # now convert to bit map
-        #img = Image.open("screen_shot.eps")
-        #img.save("screen_shot.gif", "gif")
-        cf.COLORtext = "#ffffff"
-        UpdateTimeScreen()
+        cf.ca.postscript(file=filename, height=cf.CANVASheight, width=cf.CANVASwidth, colormode='color', rotate=1)
+        cf.ColorMode.set(0)
+        BgColor()
 
-## Save scope all time array data to file
+
+# Die vier Signalverläufe sowie die Samplinzeiten dazu in eine CSV-Datei schreiben
 def BSaveData():
-    # open file to save data
     filename = asksaveasfilename(defaultextension = ".csv", filetypes=[("Comma Separated Values", "*.csv")])
     DataFile = open(filename, 'w')
-    DataFile.write( 'Sample-#, CA-V, CA-I, CB-V, CB-I \n' )
+    DataFile.write( 'Time (ms), CA-V (V), CA-I (mA), CB-V (V), CB-I (mA) \n' )
     for index in range(len(cf.VBuffA)):
-        TimePnt = float((index+0.0)/cf.SAMPLErate)
+        TimePnt = float((index+0.0)/cf.SampRate)
         DataFile.write( str(TimePnt) + ', ' + str(cf.VBuffA[index]) + ', ' + str(cf.IBuffA[index]) + ', '
                         + str(cf.VBuffB[index]) + ', ' + str(cf.IBuffB[index]) + '\n')
     DataFile.close()
- 
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Utilities
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-## Load configuration from a file, im Config File stehen zeilenwese Befehle
-## welche ausgeführt werden - Frage ob überhaupt nötig
-#def BLoadConfig(filename):
-#    # Read configuration values from file
-#    try:
-#        ConfgFile = open(filename)
-#        for line in ConfgFile:
-#            try:
-#                exec(line.rstrip())
-#            except:
-#                print( "Skipping " + line.rstrip())
-#        ConfgFile.close()
-#        UpdateAWGMenu()
-#        time.sleep(0.05)
-#        ReMakeAWGwaves()
-#        cf.session.tk.END() # Add this to turn off outputs after first tiem loading a config? 
-#        BTime()
-#    except:
-#        print( "Config File Not Found.")
-#    UpdateTimeTrace()
+
 
 # Function to close and exit ALICE
 def Bcloseexit():
@@ -423,6 +408,7 @@ def Bcloseexit():
     except:
         pass
     cf.root.destroy()
+
 
 def donothing(): # Workaround für blaue Überschriften im Measure-Menü
     pass
@@ -486,13 +472,13 @@ cf.HoldOffentry.pack(side=tk.LEFT)
 cf.HoldOffentry.delete(0,tk.END)
 cf.HoldOffentry.insert(0,0.0)
 
-hint = ttk.Label(frame1, text=" at numeric inputs \n press <Return> to confirm")
+hint = ttk.Label(frame1, text="press <Return> to confirm")
 hint.pack(side=tk.LEFT, padx=(20,0))
-
+# Tooltips
 Triggermenu_tip = CreateToolTip(Triggermenu, 'Trigger aktivieren, Triggerquelle und Triggermodus')
 Edgemenu_tip = CreateToolTip(Edgemenu, 'Triggern auf steigende oder fallende Flanke')
 Triglevel_tip = CreateToolTip(cf.TRIGGERentry, 'Triggerschwelle in V bzw. mA')
-tgb_tip = CreateToolTip(tgb, 'Triggerschwelle auf 50 % setzen')
+tgb_tip = CreateToolTip(tgb, 'Triggerschwelle in die Mitte zwischen Signalminimum und -maximum setzen')
 hldlab_tip = CreateToolTip(cf.HoldOffentry, 'Totzeit in ms nach Triggerereignis bevor erneut getriggert werden kann')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -545,7 +531,7 @@ cf.HozPossentry.delete(0,tk.END)
 cf.HozPossentry.insert(0,0.0)
 hozlab = ttk.Label(frame1, text="Horz Pos (ms):")
 hozlab.pack(side=tk.RIGHT)
-
+# Tooltips
 hozlab_tip = CreateToolTip(cf.HozPossentry, 'Position des Triggerzeitpunkts in der Darstellung - negative Werte zeigen Signal vor dem Triggerzeitpunkt, dazu zuerst Zahl und dann Minuszeichen eingeben)')
 time_tip = CreateToolTip(cf.TMsb, 'Horizontale Skalierung = Zeitbasis: Zeitabstand zwischen Gitterlinien (Div)')
 
@@ -558,11 +544,7 @@ cf.ca = tk.Canvas(frame2, width=cf.CANVASwidth, height=cf.CANVASheight, backgrou
 cf.ca.bind('<Configure>', onCAresize)
 cf.ca.bind('<1>', onCanvasClickLeft)
 cf.ca.bind('<3>', onCanvasClickRight)
-#cf.ca.bind("<Motion>",onCanvasMouse_xy)
 cf.ca.pack(side=tk.TOP, fill=tk.BOTH, expand=tk.YES)
-cf.MouseWidget = cf.ca
-
-
 # right side menu buttons
 dropmenu1 = ttk.Frame(frame2r)
 dropmenu1.pack(side=tk.TOP)
@@ -573,12 +555,11 @@ dropmenu1.pack(side=tk.TOP)
 Filemenu = ttk.Menubutton(dropmenu1, text="File", style="W4.TButton")
 Filemenu.menu = tk.Menu(Filemenu, tearoff = 0 )
 Filemenu["menu"] = Filemenu.menu
-#Filemenu.menu.add_command(label="Load Config", command=BLoadConfig) # überhaupt nötig?
-Filemenu.menu.add_command(label="Save Screen", command=BSaveScreen)
-Filemenu.menu.add_command(label="Save To CSV", command=BSaveData)
+Filemenu.menu.add_command(label="Save Screen To EPS", command=BSaveScreen)
+Filemenu.menu.add_command(label="Save Traces To CSV", command=BSaveData)
 Filemenu.pack(side=tk.LEFT, anchor=tk.W)
-
-file_tip = CreateToolTip(Filemenu, 'Speichern des Oszillkopbilds oder des Signalverlaufs')
+# Tooltips
+file_tip = CreateToolTip(Filemenu, 'Speichern des Oszillkopbilds als EPS-Datei oder der Signalverläufe als CSV-Datei')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Options Menu
@@ -587,7 +568,7 @@ Optbut=Optionmenu = ttk.Menubutton(dropmenu1, text="Options", style="W7.TButton"
 Optionmenu.menu = tk.Menu(Optionmenu, tearoff = 0 )
 Optionmenu["menu"]  = Optionmenu.menu
 Optionmenu.menu.add_command(label='Settings', command=MakeSettingsMenu)
-Optionmenu.menu.add_command(label='Sample Rate', command=MakeSampleRateMenu)
+#Optionmenu.menu.add_command(label='Sample Rate', command=MakeSampleRateMenu)
 Optionmenu.menu.add_checkbutton(label='Smooth', variable=cf.SmoothCurves, command=UpdateTimeTrace)
 Optionmenu.menu.add_checkbutton(label='Z-O-Hold', variable=cf.ZOHold, command=UpdateTimeTrace)
 Optionmenu.menu.add_checkbutton(label='Trace Avg', variable=cf.TRACEmodeTime)
@@ -609,50 +590,42 @@ measlab.pack(side=tk.LEFT, anchor=tk.W)
 MeasmenuA = ttk.Menubutton(dropmenu2, text="CA", style="W3.TButton")
 MeasmenuA.menu = tk.Menu(MeasmenuA, tearoff = 0 )
 MeasmenuA["menu"]  = MeasmenuA.menu
-MeasmenuA.menu.add_command(label="-CA-V-Verical-", foreground="blue", command=donothing)
+MeasmenuA.menu.add_command(label="-CA-V-", foreground="blue", command=donothing)
 MeasmenuA.menu.add_checkbutton(label='Avg', variable=cf.MeasDCV1)
 MeasmenuA.menu.add_checkbutton(label='Min', variable=cf.MeasMinV1)
 MeasmenuA.menu.add_checkbutton(label='Max', variable=cf.MeasMaxV1)
 MeasmenuA.menu.add_checkbutton(label='P-P', variable=cf.MeasPPV1)
 MeasmenuA.menu.add_checkbutton(label='RMS', variable=cf.MeasRMSV1)
 MeasmenuA.menu.add_separator()
-MeasmenuA.menu.add_command(label="-CA-I-Vertical", foreground="blue", command=donothing)
+MeasmenuA.menu.add_command(label="-CA-I-", foreground="blue", command=donothing)
 MeasmenuA.menu.add_checkbutton(label='Avg', variable=cf.MeasDCI1)
 MeasmenuA.menu.add_checkbutton(label='Min', variable=cf.MeasMinI1)
 MeasmenuA.menu.add_checkbutton(label='Max', variable=cf.MeasMaxI1)
 MeasmenuA.menu.add_checkbutton(label='P-P', variable=cf.MeasPPI1)
 MeasmenuA.menu.add_checkbutton(label='RMS', variable=cf.MeasRMSI1)
-MeasmenuA.menu.add_separator()
-MeasmenuA.menu.add_command(label="-CA-Horizontal-", foreground="blue", command=donothing)
-MeasmenuA.menu.add_checkbutton(label='Period', variable=cf.MeasAPER)
-MeasmenuA.menu.add_checkbutton(label='Freq', variable=cf.MeasAFREQ)
 MeasmenuA.pack(side=tk.LEFT)
 #--- Drop Down Menü zur Auswahl der Messungen CHB
 MeasmenuB = ttk.Menubutton(dropmenu2, text="CB", style="W3.TButton")
 MeasmenuB.menu = tk.Menu(MeasmenuB, tearoff = 0 )
 MeasmenuB["menu"]  = MeasmenuB.menu
-MeasmenuB.menu.add_command(label="-CB-V-Vertical-", foreground="blue", command=donothing)
+MeasmenuB.menu.add_command(label="-CB-V-", foreground="blue", command=donothing)
 MeasmenuB.menu.add_checkbutton(label='Avg', variable=cf.MeasDCV2)
 MeasmenuB.menu.add_checkbutton(label='Min', variable=cf.MeasMinV2)
 MeasmenuB.menu.add_checkbutton(label='Max', variable=cf.MeasMaxV2)
 MeasmenuB.menu.add_checkbutton(label='P-P', variable=cf.MeasPPV2)
 MeasmenuB.menu.add_checkbutton(label='RMS', variable=cf.MeasRMSV2)
 MeasmenuB.menu.add_separator()
-MeasmenuB.menu.add_command(label="-CB-I-Vertical-", foreground="blue", command=donothing)
+MeasmenuB.menu.add_command(label="-CB-I-", foreground="blue", command=donothing)
 MeasmenuB.menu.add_checkbutton(label='Avg', variable=cf.MeasDCI2)
 MeasmenuB.menu.add_checkbutton(label='Min', variable=cf.MeasMinI2)
 MeasmenuB.menu.add_checkbutton(label='Max', variable=cf.MeasMaxI2)
 MeasmenuB.menu.add_checkbutton(label='P-P', variable=cf.MeasPPI2)
 MeasmenuB.menu.add_checkbutton(label='RMS', variable=cf.MeasRMSI2)
-MeasmenuB.menu.add_separator()
-MeasmenuB.menu.add_command(label="-CB-Horizontal-", foreground="blue", command=donothing)
-MeasmenuB.menu.add_checkbutton(label='Period', variable=cf.MeasBPER)
-MeasmenuB.menu.add_checkbutton(label='Freq', variable=cf.MeasBFREQ)
 MeasmenuB.pack(side=tk.LEFT)
 
 mathbt = ttk.Button(dropmenu2, text="Math", style="Math.TButton", command = MakeMathMenu)
 mathbt.pack(side=tk.RIGHT, anchor=tk.W)
-
+# Tooltips
 measA_tip=CreateToolTip(MeasmenuA, 'Messfunktionen wie Mittelwert, RMS für Kanal A')
 measB_tip=CreateToolTip(MeasmenuB, 'Messfunktionen wie Mittelwert, RMS für Kanal B')
 math_tip = CreateToolTip(mathbt, 'Mathematikfunktionen auf Signalverläufe')
@@ -664,15 +637,35 @@ curvelab = ttk.Label(frame2r, text="Active Channel")
 curvelab.pack(side=tk.TOP, pady=(8,0))
 curvecheckb = ttk.Frame(frame2r)
 curvecheckb.pack(side=tk.TOP)
-ckbt1 = ttk.Checkbutton(curvecheckb, text='CA-V', style="Strace1.TCheckbutton", variable=cf.ShowC1_V, command=TraceSelectADC_Mux)
+ckbt1 = ttk.Checkbutton(curvecheckb, text='CA-V', style="Strace1.TCheckbutton", variable=cf.ShowC1_V, command=m1k.TraceSelectADC_Mux)
 ckbt1.grid(row=0, column=0)
-ckbt2 = ttk.Checkbutton(curvecheckb, text='CA-I', style="Strace3.TCheckbutton", variable=cf.ShowC1_I, command=TraceSelectADC_Mux)
+ckbt2 = ttk.Checkbutton(curvecheckb, text='CA-I', style="Strace3.TCheckbutton", variable=cf.ShowC1_I, command=m1k.TraceSelectADC_Mux)
 ckbt2.grid(row=0, column=1)
-ckbt3 = ttk.Checkbutton(curvecheckb, text='CB-V', style="Strace2.TCheckbutton", variable=cf.ShowC2_V, command=TraceSelectADC_Mux)
+ckbt3 = ttk.Checkbutton(curvecheckb, text='CB-V', style="Strace2.TCheckbutton", variable=cf.ShowC2_V, command=m1k.TraceSelectADC_Mux)
 ckbt3.grid(row=1, column=0)
-ckbt4 = ttk.Checkbutton(curvecheckb, text='CB-I', style="Strace4.TCheckbutton", variable=cf.ShowC2_I, command=TraceSelectADC_Mux)
+ckbt4 = ttk.Checkbutton(curvecheckb, text='CB-I', style="Strace4.TCheckbutton", variable=cf.ShowC2_I, command=m1k.TraceSelectADC_Mux)
 ckbt4.grid(row=1, column=1)
-actCh_tip = CreateToolTip(curvelab, 'Auswahl der dargestellten Signalverläufe')
+# Tooltips
+actCh_tip = CreateToolTip(curvelab, 'Auswahl der dargestellten Signalverläufe. Für 200 kS/s maximal 2 Kanäle auswählen.')
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Menü zur Auswahl der Samplingrate
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+SampMenu= ttk.Frame(frame2r)
+SampMenu.pack(side=tk.TOP, pady=(8,0))
+cf.SampRatesb = tk.Spinbox(SampMenu, width=6, values=cf.SampRateList, command=m1k.SetSampleRate)
+cf.SampRatesb.bind('<MouseWheel>', onSrateScroll)
+cf.SampRatesb.bind("<Button-4>", onSrateScroll)# with Linux OS
+cf.SampRatesb.bind("<Button-5>", onSrateScroll)
+cf.SampRatesb.bind("<Return>", onRetSrate)
+cf.SampRatesb.pack(side=tk.LEFT)
+cf.SampRatesb.delete(0,tk.END)
+cf.SampRatesb.insert(0,cf.SampRate) # mit 100 kS/s initialisieren
+Samplab = ttk.Label(SampMenu, text="Sample Rate \n (S/s)")
+Samplab.pack(side=tk.LEFT)
+
+# Tooltips
+SampRate_tip = CreateToolTip(cf.SampRatesb, 'Abtastrate für ADC (Oszi) und DAC-Abtastrate (AWG). 200 kS/s nur bei ADC falls 2 oder weniger Kanäle aktiv.')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Gain-/Offsetkorrektur für V und I der beiden Kanäle (Fenster rechts)
@@ -746,7 +739,7 @@ cf.CHBIOffsetEntry.bind('<Return>', onTextKey)
 cf.CHBIOffsetEntry.pack(side=tk.LEFT)
 cf.CHBIOffsetEntry.delete(0,tk.END)
 cf.CHBIOffsetEntry.insert(0,0.0)
-
+# Tooltips
 probe_tip = CreateToolTip(prlab, 'Korrektur von Gain- und Offsetfehler der vier Messkanäle zum Kalibrieren')
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # AWG Menü
@@ -853,12 +846,10 @@ CHBIofflab_tip = CreateToolTip(cf.CHBIPosEntry, 'Höhe der Nulllinie Kanal B Str
 # Hauptroutine
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # =============================================================================
-# Seltsam, dass es hier keinen mainloop() Befehl gibt. Statdessen wird mit dem
-# Aufruf von AnalogIn() eine While-Schleife gestartet, in der zyklisch root.update()
-# aufgerufen wird.
+# Esgibt keinen mainloop() Befehl. Statdessen wird mit dem Aufruf von AnalogIn()
+# eine While-Schleife gestartet, in der zyklisch root.update() aufgerufen wird.
 # =============================================================================
 ConSingDev() # Connect a single (only one connected) M1K device
-#BLoadConfig("default-config.cfg") # load default configuration
 logging.debug('Vor root.update() in der Hauptroutine')
 cf.root.update() # Activate updated screens  
-Analog_In() # Start sampling
+m1k.Analog_In() # Start sampling

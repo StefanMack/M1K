@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 8.9.20
+S. Mack, 15.9.20
 """
 import tkinter as tk
 import config as cf
@@ -27,7 +27,7 @@ def MakeTimeTrace():
     global TMAVline, TMBVline, TMCVline, TMDVline
     global Tmathline, TMXline, TMYline
     global MathAxis
-    global Triggerline, Triggersymbol, hldn
+    global Triggerline, Triggersymbol
     global MouseCAV, MouseCAI, MouseCBV, MouseCBI    
     global SCstart, DISsamples
     global TRACEsize
@@ -111,8 +111,8 @@ def MakeTimeTrace():
         cf.HozPossentry.delete(0,tk.END)
         cf.HozPossentry.insert(0, HozPoss)
 
-    hldn = int(cf.HoldOff * cf.SAMPLErate/1000 )
-    hozpos = int(HozPoss * cf.SAMPLErate/1000 )
+    cf.hldn = int(cf.HoldOff * cf.SampRate/1000 )
+    hozpos = int(HozPoss * cf.SampRate/1000 )
     if hozpos < 0:
         hozpos = 0        
     #  drawing the traces 
@@ -128,7 +128,7 @@ def MakeTimeTrace():
         SCmin = int(-1 * cf.TRIGGERsample)
         SCmax = int(TRACEsize - cf.TRIGGERsample - 0)
     else:
-        SCmin = 0 # hldn
+        SCmin = 0 # cf.hldn
         SCmax = TRACEsize - 1
     if SCstart < SCmin:             # No reading before start of array
         SCstart = SCmin
@@ -143,18 +143,18 @@ def MakeTimeTrace():
     c1 = cf.GRH / 2.0 + cf.Y0T    # fixed correction channel A
     c2 = cf.GRH / 2.0 + cf.Y0T    # fixed correction channel B
  
-    DISsamples = cf.SAMPLErate * 10.0 * cf.TIMEdiv / 1000.0 # number of samples to display
+    DISsamples = cf.SampRate * 10.0 * cf.TIMEdiv / 1000.0 # number of samples to display
     T1Vline = []                    # V Trace line channel A
     T2Vline = []                    # V Trace line channel B
     T1Iline = []                    # I Trace line channel A
     T2Iline = []                    # I Trace line channel B
 
     Tmathline = []                  # math trce line
-    TMXline = []                    # X math Trace line
-    TMYline = []                    # Y math Trace line
+    #TMXline = []                    # X math Trace line
+    #TMYline = []                    # Y math Trace line
     if len(cf.VBuffA) < 4 and len(cf.VBuffB) < 4 and len(cf.IBuffA) < 4 and len(cf.IBuffB) < 4:
         return
-    t = int(SCstart + cf.TRIGGERsample) # - (TriggerPos * cf.SAMPLErate) # t = Start sample in trace
+    t = int(SCstart + cf.TRIGGERsample) # - (TriggerPos * cf.SampRate) # t = Start sample in trace
     if t < 0:
         t = 0
     x = 0                           # Horizontal screen pixel
@@ -167,7 +167,7 @@ def MakeTimeTrace():
 
     if (DISsamples <= cf.GRW):
         Xstep = cf.GRW / DISsamples
-        if cf.AWGBMode.get() == 2 and cf.Two_X_Sample.get() == 0:
+        if cf.AWGBMode.get() == 2 and cf.Two_X_Sample == 0:
             xa = int((Xstep/-2.5) - (Xstep*cf.trgIpol))
         else:
             xa = 0 - int(Xstep*cf.trgIpol) # adjust start pixel for interpolated trigger point
@@ -331,7 +331,7 @@ def MakeTimeTrace():
         x1 = 0.0                          # x position of trace line
         ylo = 0.0                       # ymin position of trace 1 line
         yhi = 0.0                       # ymax position of trace 1 line
-        t = int(SCstart + cf.TRIGGERsample) # - (TriggerPos * cf.SAMPLErate) # t = Start sample in trace
+        t = int(SCstart + cf.TRIGGERsample) # - (TriggerPos * cf.SampRate) # t = Start sample in trace
         if t > len(cf.VBuffA)-1:
             t = 0
         if t < 0:
@@ -764,6 +764,7 @@ def MakeTimeScreen():
     if len(Triggerline) > 2:                    # Avoid writing lines with 1 coordinate
         cf.ca.create_polygon(Triggerline, outline=cf.COLORtrigger, fill=cf.COLORtrigger, width=1)
         cf.ca.create_line(Triggersymbol, fill=cf.COLORtrigger, width=cf.GridWidth.get())
+        TgLabel = ""
         if cf.TgInput.get() == 1:
             TgLabel = "CA-V"
         if cf.TgInput.get() == 2:
@@ -860,7 +861,7 @@ def MakeTimeScreen():
     # Info Samplingrate
     x = cf.X0L+2
     y = 12
-    txt = txt + "   Samplingrate: " + str(cf.SAMPLErate) + " S/s"
+    txt = txt + "   Sample Rate: " + str(cf.SampRate) + " S/s"
     # Info Horizontalskalierung
     txt = txt + "   Horizontal Scale/Pos: "
     vx = cf.TIMEdiv

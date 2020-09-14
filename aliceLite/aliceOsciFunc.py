@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 8.9.20
+S. Mack, 15.9.20
 """
 import math
 import time
@@ -12,18 +12,16 @@ import tkinter.messagebox as tkm
 import pysmu as smu
 from aliceTimeFunc import MakeTimeTrace, MakeTimeScreen
 from aliceAwgFunc import BAWGEnab
-import aliceM1kSamp as m1k
 import config as cf
 import logging
 
 PowerStatus = 1 # 0 stopped, 1 start, 2 running, 3 stop and restart, 4 stop
-HozPoss = 0 #
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Oszilloskop Funktionen Vertikal-/Horizontaldarstellung
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     
-## Stop (pause) scope tool
+# Kontinuierliches Sampling beenden (Stopp-Taste in UI betätigt)
 def BStop():
     logging.debug('BStop()')
     if (cf.RUNstatus.get() == 1):
@@ -49,28 +47,20 @@ def BTime():
         cf.TIMEdiv = 0.5
         cf.TMsb.delete(0,"end")
         cf.TMsb.insert(0,cf.TIMEdiv)
-    # Switch to 2X sampleling if time scale small enough
-    Samples_per_div = cf.TIMEdiv * 100.0 # samples per mSec @ base sample rate
-    if Samples_per_div < 20.0:
-        cf.Two_X_Sample.set(1)
-    else:
-        cf.Two_X_Sample.set(0)
-    m1k.SetADC_Mux()
-    #
+
     if cf.RUNstatus.get() == 2:      # Restart if running
         cf.RUNstatus.set(4)
     UpdateTimeTrace()           # Always Update
 
 #---Set Horx possition from entry widget
 def BHozPoss(event):
-    logging.debig('BHozPoss()')
-    global HozPoss
+    logging.debug('BHozPoss()')
     try:
-        HozPoss = float(eval(cf.HozPossentry.get()))
+        cf.HozPoss = float(eval(cf.HozPossentry.get()))
         logging.debug('BHozPoss() with HozPoss = {}'.format(float(eval(cf.HozPossentry.get()))))
     except:
         cf.HozPossentry.delete(0,tk.END)
-        cf.HozPossentry.insert(0, HozPoss)
+        cf.HozPossentry.insert(0, cf.HozPoss)
 
 def BCHAlevel():
     logging.debug('BCHAlevel()')
@@ -251,9 +241,9 @@ def SetTriggerPoss(): # vermutlich überflüssig
     if cf.TIMEdiv < 0.0002:
         cf.TIMEdiv = 0.01
     if cf.TgInput.get() > 0:
-        HozPoss = -5 * cf.TIMEdiv
+        cf.HozPoss = -5 * cf.TIMEdiv
         cf.HozPossentry.delete(0,tk.END)
-        cf.HozPossentry.insert(0, HozPoss)
+        cf.HozPossentry.insert(0, cf.HozPoss)
         
 # Routine to find rising edge of traces
 def FindRisingEdge(Trace1, Trace2):
@@ -265,14 +255,14 @@ def FindRisingEdge(Trace1, Trace2):
     anr1 = bnr1 = 0
     anf1 = bnf1 = 1
     anr2 = bnr2 = 2
-    hldn = int(cf.HoldOff * cf.SAMPLErate/1000)
+    cf.hldn = int(cf.HoldOff * cf.SampRate/1000)
 
     if cf.TgInput.get() > 0: # if triggering right shift arrays to undo trigger left shift
         Trace1 = np.roll(Trace1, -cf.LShift)
         Trace2 = np.roll(Trace2, -cf.LShift)
     else:
-        Trace1 = np.roll(Trace1, -hldn)
-        Trace2 = np.roll(Trace2, -hldn)
+        Trace1 = np.roll(Trace1, -cf.hldn)
+        Trace2 = np.roll(Trace2, -cf.hldn)
     try:
         MidV1 = (np.amax(Trace1)+np.amin(Trace1))/2.0
         MidV2 = (np.amax(Trace2)+np.amin(Trace2))/2.0
@@ -285,8 +275,8 @@ def FindRisingEdge(Trace1, Trace2):
     AIrising = [i - (Trace1[i] - MidV1)/(Trace1[i] - Trace1[i-1]) for i in Arising]
     AIfalling = [i - (MidV1 - Trace1[i])/(Trace1[i-1] - Trace1[i]) for i in Afalling]
     
-    CHAfreq = cf.SAMPLErate / np.mean(np.diff(AIrising))
-    CHAperiod = (np.mean(np.diff(AIrising)) * 1000.0) / cf.SAMPLErate # time in mSec
+    CHAfreq = cf.SampRate / np.mean(np.diff(AIrising))
+    CHAperiod = (np.mean(np.diff(AIrising)) * 1000.0) / cf.SampRate # time in mSec
     # Catch zero length array?
     if len(Arising) == 0:
         return
@@ -329,8 +319,8 @@ def FindRisingEdge(Trace1, Trace2):
     BIrising = [i - (Trace2[i] - MidV2)/(Trace2[i] - Trace2[i-1]) for i in Brising]
     BIfalling = [i - (MidV2 - Trace2[i])/(Trace2[i-1] - Trace2[i]) for i in Bfalling]
 
-    CHBfreq = cf.SAMPLErate / np.mean(np.diff(BIrising))
-    CHBperiod = (np.mean(np.diff(BIrising)) * 1000.0) / cf.SAMPLErate # time in mSec
+    CHBfreq = cf.SampRate / np.mean(np.diff(BIrising))
+    CHBperiod = (np.mean(np.diff(BIrising)) * 1000.0) / cf.SampRate # time in mSec
 # Catch zero length array?
     if len(Brising) == 0:
         return
@@ -368,21 +358,21 @@ def FindRisingEdge(Trace1, Trace2):
             except:
                 bnf1 = 1
     
-    CHAHW = float(((anf1 - anr1) * 1000.0) / cf.SAMPLErate)
-    CHALW = float(((anr2 - anf1) * 1000.0) / cf.SAMPLErate)
+    CHAHW = float(((anf1 - anr1) * 1000.0) / cf.SampRate)
+    CHALW = float(((anr2 - anf1) * 1000.0) / cf.SampRate)
     CHADCy = float(anf1 - anr1) / float(anr2 - anr1) * 100.0 # in percent
-    CHBHW = float(((bnf1 - bnr1) * 1000.0) / cf.SAMPLErate)
-    CHBLW = float(((bnr2 - bnf1) * 1000.0) / cf.SAMPLErate)
+    CHBHW = float(((bnf1 - bnr1) * 1000.0) / cf.SampRate)
+    CHBLW = float(((bnr2 - bnf1) * 1000.0) / cf.SampRate)
     CHBDCy = float(bnf1 - bnr1) / float(bnr2 - bnr1) * 100.0 # in percent
 
     if bnr1 > anr1:
-        CHBADelayR1 = float((bnr1 - anr1) * 1000.0 / cf.SAMPLErate)
+        CHBADelayR1 = float((bnr1 - anr1) * 1000.0 / cf.SampRate)
     else:
-        CHBADelayR1 = float((bnr2 - anr1) * 1000.0 / cf.SAMPLErate)
-    CHBADelayR2 = float((bnr2 - anr2) * 1000.0 / cf.SAMPLErate)
-    CHBADelayF = float((bnf1 - anf1) * 1000.0 / cf.SAMPLErate)
+        CHBADelayR1 = float((bnr2 - anr1) * 1000.0 / cf.SampRate)
+    CHBADelayR2 = float((bnr2 - anr2) * 1000.0 / cf.SampRate)
+    CHBADelayF = float((bnf1 - anf1) * 1000.0 / cf.SampRate)
     try:
-        CHABphase = 360.0*(float((bnr1 - anr1) * 1000.0 / cf.SAMPLErate))/CHAperiod
+        CHABphase = 360.0*(float((bnr1 - anr1) * 1000.0 / cf.SampRate))/CHAperiod
     except:
         CHABphase = 0.0
     if CHABphase < 0.0:
@@ -401,7 +391,7 @@ def ReInterploateTrigger(TrgBuff):
 # Find the sample where trigger event happened 
 def FindTriggerSample(TrgBuff): # find trigger time sample point of passed waveform array
     logging.debug('FindTriggerSample()')
-    global TRACEsize, HozPoss, hozpos  
+    global TRACEsize, hozpos  
     # Set the TRACEsize variable
     TRACEsize = cf.SHOWsamples               # Set the trace length
     cf.trgIpol = 0
@@ -438,14 +428,14 @@ def FindTriggerSample(TrgBuff): # find trigger time sample point of passed wavef
         cf.HoldOffentry.delete(0,tk.END)
         cf.HoldOffentry.insert(0, cf.HoldOff)
     try: # slide trace left right by HozPoss
-        HozPoss = float(eval(cf.HozPossentry.get()))
+        cf.HozPoss = float(eval(cf.HozPossentry.get()))
     except:
         cf.HozPossentry.delete(0,tk.END)
-        cf.HozPossentry.insert(0, HozPoss)    
-    hldn = int(cf.HoldOff * cf.SAMPLErate/1000)
-    hozpos = int(HozPoss * cf.SAMPLErate/1000)
+        cf.HozPossentry.insert(0, cf.HozPoss)    
+    cf.hldn = int(cf.HoldOff * cf.SampRate/1000)
+    hozpos = int(cf.HozPoss * cf.SampRate/1000)
     if hozpos >= 0:
-        cf.TRIGGERsample = hldn
+        cf.TRIGGERsample = cf.hldn
     else:
         cf.TRIGGERsample = abs(hozpos)     
     Nmax = int(TRACEsize / 1.5) # first 2/3 of data set
@@ -494,7 +484,7 @@ def FindTriggerSample(TrgBuff): # find trigger time sample point of passed wavef
         cf.TRIGGERsample = n - 1
         cf.Is_Triggered = 1
     elif n > Nmax: # Didn't find edge in first 2/3 of data set
-        cf.TRIGGERsample = 1 + hldn # reset to begining
+        cf.TRIGGERsample = 1 + cf.hldn # reset to begining
         cf.Is_Triggered = 0
     if cf.trgIpol > 1:
         cf.trgIpol = 1 # never more than 100% of a sample period

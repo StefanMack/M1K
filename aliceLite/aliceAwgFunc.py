@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 8.9.20
+S. Mack, 15.9.20
 
 AWGXMaxvalue war vormals AWGXOffsetvalue
 AWGXMinvalue war vormals AWGXAmplvalue
@@ -19,10 +19,6 @@ import tkinter as tk
 # Funktionen und Einstellungen beide Arbitärgeneratoren
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #--- Auslesen der in der UI gewählten Signalform
-#def ReMakeAWGwaves(): # durch UpdateAwgCont() ersetzt
-#    logging.debug('ReMakeAWGwaves()')
-#    UpdateAwgCont()
-#    time.sleep(0.05)
 
 def UpdateAwgCont(*dummy): # * damit mit und ohne Übergabe von Argumenten (z.B. Event)
     logging.debug('UpdateAwgCont()')
@@ -189,8 +185,12 @@ def UpdateAWGA():
     BAWGAFreq()
     BAWGADutyCycle()
     BAWGAShape()    
+    if cf.SampRate == 200000: # 200 kS/s bezieht sich nur auf ADC da durch Mux-Änderung
+        AWGSampRate = 100000 # sonst nachfolgend falscher AWGAperiodvalue
+    else:
+        AWGSampRate = cf.SampRate
     if AWGAFreqvalue > 0.0:
-        AWGAperiodvalue = cf.AWGSAMPLErate/AWGAFreqvalue
+        AWGAperiodvalue = AWGSampRate/AWGAFreqvalue
     else:
         AWGAperiodvalue = 0.0
     # Nur "Open termination", keine Auswahl 
@@ -364,8 +364,12 @@ def UpdateAWGB():
     BAWGBFreq()
     BAWGBDutyCycle()
     BAWGBShape()
+    if cf.SampRate == 200000: # 200 kS/s bezieht sich nur auf ADC da durch Mux-Änderung
+        AWGSampRate = 100000 # sonst nachfolgend falscher AWGAperiodvalue
+    else:
+        AWGSampRate = cf.SampRate
     if AWGBFreqvalue > 0.0:
-        AWGBperiodvalue = cf.AWGSAMPLErate/AWGBFreqvalue
+        AWGBperiodvalue = AWGSampRate/AWGBFreqvalue
     else:
         AWGBperiodvalue = 0.0     
     # Open termination

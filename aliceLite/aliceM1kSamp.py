@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 8.9.20
+S. Mack, 15.9.20
 """
 import time
 import numpy as np
@@ -24,7 +24,7 @@ TRACEresetTime = True # True for first new trace, False for averageing
 InOffA = InGainA = InOffB = InGainB = 0.0 # Variablen für Input aus UI
 CurOffA = CurOffB = CurGainA = CurGainB = 0.0
 
-Alternate_Sweep_Mode = 1 # 1 wenn drei oder mehr Signale gesampelt werden
+Alternate_Sweep_Mode = 1 # 1 wenn drei oder mehr Signale gesampelt werden, 200 kS/s nur bei = 0
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # M1K Samplingfunktionen
@@ -90,116 +90,25 @@ def Analog_Time_In():
         CurGainB = float(cf.CHBIGainEntry.get())
     except:
         CurGainB = 1.0
-# Dedecide which Fast or Slow sweep routine to call
-    if cf.TIMEdiv > 500:
-        Analog_Slow_time() # failed attempt as rolling trace
-    else:
-        Analog_Fast_time()
+        
+    Sample()
 
 
-#---Right now this is a failed attempt to plot slow sweeps.
-def Analog_Slow_time():
-    logging.debug("Analog_Slow_time()")
-    global ADsignal1
-    global VmemoryA, VmemoryB, ImemoryA, ImemoryB
-    global HozPoss
-    global TRACEsize, First_Slow_sweep, ShiftPointer
-    global hldn
-    global TRACErefresh
-    global SCREENrefresh, DCrefresh
-    global InOffA, InGainA, InOffB, InGainB, CurOffA, CurOffB, CurGainA, CurGainB
-    global cha_A1Entry, cha_A2Entry, chb_A1Entry, chb_A2Entry
-    global cal, Last_ADC_Mux_Mode
-    global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
 
-    # Starting acquisition
-    DCVA0 = DCVB0 = DCIA0 = DCIB0= 0.0 # initalize measurment variable
-    
-    NumSamples = 1 # int(cf.SAMPLErate/cf.TIMEdiv)
-    if First_Slow_sweep == 0:
-        BufferLen = cf.TIMEdiv*12.0
-        cf.VBuffA = np.ones(BufferLen)       
-        cf.VBuffB = np.ones(BufferLen)
-        cf.IBuffA = np.ones(BufferLen)       
-        cf.IBuffB = np.ones(BufferLen)
-        First_Slow_sweep = 1
-
-    if cf.session.continuous:
-        ADsignal1 = cf.devx.read(NumSamples, -1, True) # get samples for both channel A and B
-
-    else:
-        ADsignal1 = cf.devx.get_samples(NumSamples) # , True) # get samples for both channel A and B
-
-    # get_samples returns a list of values for voltage [0] and current [1]
-    for index in range(NumSamples): # calculate average
-        DCVA0 += ADsignal1[index][0][0] # Sum for average CA voltage 
-        DCVB0 += ADsignal1[index][1][0] # Sum for average CB voltage
-        DCIA0 += ADsignal1[index][0][1] # Sum for average CA current 
-        DCIB0 += ADsignal1[index][1][1] # Sum for average CB current
-    
-    ## Messwerte werden wohl bei jedem Trace alle automatisch berechnet
-    ## Messwerte sind globale Variablen
-    
-    DCVA0 = DCVA0/(NumSamples) # calculate V average
-    DCVB0 = DCVB0/(NumSamples) # calculate V average
-    DCVA0 = (DCVA0 - InOffA) * InGainA
-    DCVB0 = (DCVB0 - InOffB) * InGainB
-    DCIA0 = DCIA0/(NumSamples) # calculate I average
-    DCIB0 = DCIB0/(NumSamples) # calculate I average
-    DCIA0 = DCIA0 * 1000 # convert to mA
-    DCIB0 = DCIB0 * 1000 # convert to mA
-    DCIA0 = (DCIA0 - CurOffA) * CurGainA
-    DCIB0 = (DCIB0 - CurOffB) * CurGainB
-# Shift in next new sample
-    cf.VBuffA = shift_buffer(cf.VBuffA, -1, DCVA0)
-    cf.VBuffB = shift_buffer(cf.VBuffB, -1, DCVB0)
-    cf.IBuffA = shift_buffer(cf.IBuffA, -1, DCIA0)
-    cf.IBuffB = shift_buffer(cf.IBuffB, -1, DCIB0)
-# Calculate measurement values
-    cf.DCV1 = np.mean(cf.VBuffA)
-    cf.DCV2 = np.mean(cf.VBuffB)
-    cf.DCI1 = np.mean(cf.IBuffA)
-    cf.DCI2 = np.mean(cf.IBuffB)
-# find min and max values
-    cf.MinV1 = np.amin(cf.VBuffA)
-    cf.MaxV1 = np.amax(cf.VBuffA)
-    cf.MinV2 = np.amin(cf.VBuffB)
-    cf.MaxV2 = np.amax(cf.VBuffB)
-    cf.MinI1 = np.amin(cf.IBuffA)
-    cf.MaxI1 = np.amax(cf.IBuffA)
-    cf.MinI2 = np.amin(cf.IBuffB)
-    cf.MaxI2 = np.amax(cf.IBuffB)
-# RMS value = square root of average of the data record squared
-    cf.SV1 = np.sqrt(np.mean(np.square(cf.VBuffA)))
-    cf.SI1 = np.sqrt(np.mean(np.square(cf.IBuffA)))
-    cf.SV2 = np.sqrt(np.mean(np.square(cf.VBuffB)))
-    cf.SI2 = np.sqrt(np.mean(np.square(cf.IBuffB)))
-    cf.SVA_B = np.sqrt(np.mean(np.square(cf.VBuffA-cf.VBuffB)))
-
-    UpdateTimeAll()         # Update Data, trace and time screen
-    if (cf.RUNstatus.get() == 3) or (cf.RUNstatus.get() == 4):
-        if cf.RUNstatus.get() == 3:
-            cf.RUNstatus.set(0)
-        if cf.RUNstatus.get() == 4:          
-            cf.RUNstatus.set(1)
-        UpdateTimeScreen()
-        # update screens
-
-# Wie unterscheidet sich dieses Sampling vom Slow Mode?
-#---routine for time scales faster than 500 mSec/Div
-def Analog_Fast_time():
-    logging.debug("Analog_Fast_time()")
+#---
+def Sample():
     global ADsignal1, Alternate_Sweep_Mode
     global VmemoryA, VmemoryB, ImemoryA, ImemoryB
     global HozPoss
     global TRACEresetTime
-    global TIMEdiv1x, hldn
+    global TIMEdiv1x
     global TRACErefresh
     global SCREENrefresh, DCrefresh
     global InOffA, InGainA, InOffB, InGainB, CurOffA, CurOffB, CurGainA, CurGainB
     global cha_A1Entry, cha_A2Entry, chb_A1Entry, chb_A2Entry
     global cal, Last_ADC_Mux_Mode
     global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
+    logging.debug("Sample() Sample Rate={} alternate_sweep_mode={} ADC_Mux_Mode={} Two_X_Sample={}".format(cf.SampRate, Alternate_Sweep_Mode,cf.ADC_Mux_Mode.get(),cf.Two_X_Sample))
 
     if cf.TRACEmodeTime.get() == 0 and TRACEresetTime == False:
         TRACEresetTime = True               # Clear the memory for averaging
@@ -228,30 +137,31 @@ def Analog_Fast_time():
         cf.HozPossentry.delete(0,tk.END)
         cf.HozPossentry.insert(0, HozPoss)
 
-    hldn = int(cf.HoldOff * cf.SAMPLErate/1000 )
-    hozpos = int(HozPoss * cf.SAMPLErate/1000 )
+    cf.hldn = int(cf.HoldOff * cf.SampRate/1000 )
+    hozpos = int(HozPoss * cf.SampRate/1000 )
     if hozpos < 0:
         hozpos = 0
-    twoscreens = int(cf.SAMPLErate * 20.0 * cf.TIMEdiv / 1000.0) # number of samples to acquire, 2 screen widths
-    if hldn+hozpos > cf.MaxSamples-twoscreens:
-        hldn = cf.MaxSamples-twoscreens-hozpos
+    twoscreens = int(cf.SampRate * 20.0 * cf.TIMEdiv / 1000.0) # number of samples to acquire, 2 screen widths
+    if cf.hldn+hozpos > cf.MaxSamples-twoscreens:
+        cf.hldn = cf.MaxSamples-twoscreens-hozpos
         cf.HoldOffentry.delete(0,tk.END)
-        cf.HoldOffentry.insert(0, hldn*1000/cf.SAMPLErate)
+        cf.HoldOffentry.insert(0, cf.hldn*1000/cf.SampRate)
       
-    cf.SHOWsamples = twoscreens + hldn + hozpos
+    cf.SHOWsamples = twoscreens + cf.hldn + hozpos
     if cf.SHOWsamples > cf.MaxSamples: # or a Max of 100,000 samples
         cf.SHOWsamples = cf.MaxSamples
     if cf.SHOWsamples < 2000: # or a Min of 2000 samples
         cf.SHOWsamples = 2000
     if hozpos >= 0:
-        cf.TRIGGERsample = hldn
+        cf.TRIGGERsample = cf.hldn
     else:
         cf.TRIGGERsample = abs(hozpos)
     cf.TRIGGERsample = cf.TRIGGERsample + hozpos #
     # Starting acquisition
     if cf.session.continuous:
+        logging.debug("Sample() session continuous")
         ADsignal1 = cf.devx.read(cf.SHOWsamples, -1, True) # get samples for both channel A and B
-    
+        # Bei 200 kS/s sind am Ende aber doppelt so viele Samples vorhanden!
     else:
         ADsignal1 = cf.devx.get_samples(cf.SHOWsamples) # , True) # get samples for both channel A and B
         # waite to finish then return to open termination
@@ -259,9 +169,8 @@ def Analog_Fast_time():
         cf.devx.ctrl_transfer( 0x40, 0x51, 33, 0, 0, 0, 100) # set CHA GND switch to open
         cf.devx.ctrl_transfer( 0x40, 0x51, 37, 0, 0, 0, 100) # set CHB 2.5 V switch to open
         cf.devx.ctrl_transfer( 0x40, 0x51, 38, 0, 0, 0, 100) # set CHB GND switch to open
-    
-    # MUX-Modi: Modus 0 macht für Sensortechnik am meisten Sinn, wenn für Ultraschallsensor mit 200.000 S/s
-    if Alternate_Sweep_Mode == 1 and cf.Two_X_Sample.get() == 1:
+    # 200 kS/s und >2 Traces kommt eigentlich nicht vor: Hier passiert auch nichts...
+    if Alternate_Sweep_Mode == 1 and cf.Two_X_Sample == 1:
         if cf.ADC_Mux_Mode.get() == 0: # VA and VB
             cf.VBuffA = [] # Clear the V Buff array for trace A
             cf.VBuffB = [] # Clear the V Buff array for trace B
@@ -279,16 +188,19 @@ def Analog_Fast_time():
         cf.IBuffA = [] # Clear the I Buff array for trace A
         cf.VBuffB = [] # Clear the V Buff array for trace B
         cf.IBuffB = [] # Clear the I Buff array for trace B
-    increment = 1
+
+    increment = 1   
     index = 0
+    
     if cf.SHOWsamples != len(ADsignal1):
         cf.SHOWsamples = len(ADsignal1)
-    while index < cf.SHOWsamples: # build arrays and decimate if needed
-    ## Samplingrate 200.000 S/s geht nur, wenn nur zwei der 4 möglichen Größen
-    ## VA, IA, VB, IB gemessen werden. Welche das sind wird über den ADC_Mux_Mode
-    ## bestimmt.  
-        if cf.Two_X_Sample.get() == 1 and cf.ADC_Mux_Mode.get() < 6:
+        
+    while index < cf.SHOWsamples:
+        # 200 kS/s und <= 2 Traces (d.h.Alternate_Sweep_Mode = 0)
+        if cf.Two_X_Sample == 1 and cf.ADC_Mux_Mode.get() < 6:
+            logging.debug("Sample() cf.Two_X_Sample == 1 and cf.ADC_Mux_Mode.get() < 6")
             if cf.ADC_Mux_Mode.get() == 0: # VA and VB
+                logging.debug("ADC_Mux_Mode.get() == 0")
                 cf.VBuffA.append(ADsignal1[index][0][0])
                 cf.VBuffA.append(ADsignal1[index][1][1])
                 cf.VBuffB.append(ADsignal1[index][0][1])
@@ -308,6 +220,7 @@ def Analog_Fast_time():
                     cf.VBuffA.append(0.0) # fill as a place holder
                     cf.VBuffB.append(0.0) # fill as a place holder
                     cf.VBuffB.append(0.0) # fill as a place holder
+            #? Wieso hier diese Skalierung?
             elif cf.ADC_Mux_Mode.get() == 2: # VA and IB
                 cf.VBuffA.append((ADsignal1[index][0][1])/1024.0)
                 cf.VBuffA.append((ADsignal1[index][1][0])/1024.0)
@@ -359,8 +272,9 @@ def Analog_Fast_time():
             cf.IBuffB.append(ADsignal1[index][1][1])
         index = index + increment
 
-    cf.SHOWsamples = len(cf.VBuffA)
-    if Alternate_Sweep_Mode == 1 and cf.Two_X_Sample.get() == 1:
+    cf.SHOWsamples = len(cf.VBuffA) # bei 200 kS/s verdopplung
+     # kommt eigentlich nicht vor...
+    if Alternate_Sweep_Mode == 1 and cf.Two_X_Sample == 1:
         if cf.ADC_Mux_Mode.get() == 0: # VA and VB
             cf.VBuffA = np.array(cf.VBuffA)
             cf.VBuffB = np.array(cf.VBuffB)
@@ -391,6 +305,7 @@ def Analog_Fast_time():
         SetADC_Mux()
    
     else:
+        # nur Umrechnung in mA für I-Kanäle
         cf.VBuffA = np.array(cf.VBuffA)
         cf.VBuffB = np.array(cf.VBuffB)
         cf.IBuffA = np.array(cf.IBuffA) * 1000 # convert to mA
@@ -441,26 +356,26 @@ def Analog_Fast_time():
     # DC value = average of the data record
     Endsample = cf.SHOWsamples - 10 # average over all samples
     ## Berechnung Messwerte im Fast Scan Modus auch für jeden Trace            
-    cf.DCV1 = np.mean(cf.VBuffA[hldn:Endsample])
-    cf.DCV2 = np.mean(cf.VBuffB[hldn:Endsample])
+    cf.DCV1 = np.mean(cf.VBuffA[cf.hldn:Endsample])
+    cf.DCV2 = np.mean(cf.VBuffB[cf.hldn:Endsample])
     # convert current values to mA
-    cf.DCI1 = np.mean(cf.IBuffA[hldn:Endsample])
-    cf.DCI2 = np.mean(cf.IBuffB[hldn:Endsample])
+    cf.DCI1 = np.mean(cf.IBuffA[cf.hldn:Endsample])
+    cf.DCI2 = np.mean(cf.IBuffB[cf.hldn:Endsample])
     # find min and max values
-    cf.MinV1 = np.amin(cf.VBuffA[hldn:Endsample])
-    cf.MaxV1 = np.amax(cf.VBuffA[hldn:Endsample])
-    cf.MinV2 = np.amin(cf.VBuffB[hldn:Endsample])
-    cf.MaxV2 = np.amax(cf.VBuffB[hldn:Endsample])
-    cf.MinI1 = np.amin(cf.IBuffA[hldn:Endsample])
-    cf.MaxI1 = np.amax(cf.IBuffA[hldn:Endsample])
-    cf.MinI2 = np.amin(cf.IBuffB[hldn:Endsample])
-    cf.MaxI2 = np.amax(cf.IBuffB[hldn:Endsample])
+    cf.MinV1 = np.amin(cf.VBuffA[cf.hldn:Endsample])
+    cf.MaxV1 = np.amax(cf.VBuffA[cf.hldn:Endsample])
+    cf.MinV2 = np.amin(cf.VBuffB[cf.hldn:Endsample])
+    cf.MaxV2 = np.amax(cf.VBuffB[cf.hldn:Endsample])
+    cf.MinI1 = np.amin(cf.IBuffA[cf.hldn:Endsample])
+    cf.MaxI1 = np.amax(cf.IBuffA[cf.hldn:Endsample])
+    cf.MinI2 = np.amin(cf.IBuffB[cf.hldn:Endsample])
+    cf.MaxI2 = np.amax(cf.IBuffB[cf.hldn:Endsample])
     # RMS value = square root of average of the data record squared
-    cf.SV1 = np.sqrt(np.mean(np.square(cf.VBuffA[hldn:Endsample])))
-    cf.SI1 = np.sqrt(np.mean(np.square(cf.IBuffA[hldn:Endsample])))
-    cf.SV2 = np.sqrt(np.mean(np.square(cf.VBuffB[hldn:Endsample])))
-    cf.SI2 = np.sqrt(np.mean(np.square(cf.IBuffB[hldn:Endsample])))
-    cf.SVA_B = np.sqrt(np.mean(np.square(cf.VBuffA[hldn:Endsample]-cf.VBuffB[hldn:Endsample])))
+    cf.SV1 = np.sqrt(np.mean(np.square(cf.VBuffA[cf.hldn:Endsample])))
+    cf.SI1 = np.sqrt(np.mean(np.square(cf.IBuffA[cf.hldn:Endsample])))
+    cf.SV2 = np.sqrt(np.mean(np.square(cf.VBuffB[cf.hldn:Endsample])))
+    cf.SI2 = np.sqrt(np.mean(np.square(cf.IBuffB[cf.hldn:Endsample])))
+    cf.SVA_B = np.sqrt(np.mean(np.square(cf.VBuffA[cf.hldn:Endsample]-cf.VBuffB[cf.hldn:Endsample])))
 
     UpdateTimeAll()         # Update Data, trace and time screen
        # Update Data, trace
@@ -477,37 +392,35 @@ def Analog_Fast_time():
     UpdateTimeScreen()
             
             
-# Einstellen der Samplingrate, falls im Fenster diese geändert wurde
+# Einstellen der Samplingrate, falls im Fenster diese geändert wurde oder 200 kS/s gewählt
 def SetSampleRate():
-    global BaseRatesb
-    #
     WasRunning = 0
     if (cf.RUNstatus.get() == 1):
         WasRunning = 1
         BStop() # Force Stop loop if running
     try:
-        NewRate = int(BaseRatesb.get())
-        # Basis-Samplingrate kann nicht größer als 100.000 S/s sein wenn diese direkt über
-        # die Benutzeroberfläche eingegeben wird. Der Wert 200.000 S/s geht nur über den
-        # Button "Two_X_Sample"
-        if NewRate <= 100000: # rate has to be less than or equal to 100,000
-            cf.BaseSampleRate = NewRate
-            logging.debug("SetSampleRate() {} S/s".format(cf.BaseSampleRate))
-        else:
-        # Bei zu großer Samplinrate wird diese im Fenster auf 100000 zurück gesetzt
-            cf.BaseSampleRate = 100000
-            BaseRatesb.delete(0,tk.END)
-            BaseRatesb.insert(0,cf.BaseSampleRate)
-        cf.SAMPLErate = cf.BaseSampleRate # Scope sample rate
+        NewRate = int(cf.SampRatesb.get())
+        # Samplingrate kann nicht größer als 200.000 S/s sein
+        # 200.000 S/s geht nur wenn ein oder zwei Kanäle gesampelt werden
+        if (NewRate > 200000) or (NewRate == 200000 and Alternate_Sweep_Mode == 1): 
+            # Bei zu großer Samplinrate diese in Spinbox auf 100 kS/s zurücksetzen
+            cf.SampRate = 100000
+            cf.SampRatesb.delete(0,tk.END)
+            cf.SampRatesb.insert(0,cf.SampRate)
+        else:            
+            cf.SampRate = NewRate
+            logging.debug("SetSampleRate() NewRate={} S/s".format(cf.SampRate))
     except:
-        pass
-    # Samplingrate wird tatsächlich direkt am M1K eingestellt
-    cf.session.configure(sample_rate=cf.BaseSampleRate)
-    cf.BaseSampleRate = cf.session.sample_rate
-    cf.SAMPLErate = cf.BaseSampleRate # Scope sample rate
-    cf.AWGSAMPLErate = cf.BaseSampleRate
-    BaseRatesb.delete(0,tk.END)
-    BaseRatesb.insert(0,cf.BaseSampleRate)
+        logging.warning('Exception in SetSampleRate()')
+    if NewRate == 200000:
+        cf.Two_X_Sample = 1
+    else:
+        cf.Two_X_Sample = 0
+    SetADC_Mux()
+    cf.session.configure(sample_rate=cf.SampRate)
+    #cf.SampRate = cf.session.sample_rate # Wieso zurücklesen aus M1K?
+    cf.SampRatesb.delete(0,tk.END)
+    cf.SampRatesb.insert(0,cf.SampRate)
     UpdateAwgCont() # remake AWG waveforms for new rate
     if (WasRunning == 1):
         WasRunning = 0
@@ -525,7 +438,8 @@ def SetADC_Mux():
     v2_adc_conf = 0x20F7
     i2_adc_conf = 0x20F1
     # Achtung! ADC_Mux_Mode und cf.devx Mux Mode teils nicht gleich
-    if cf.Two_X_Sample.get() == 1:
+    logging.debug('SetADC_Mux() ADC_Mux_Mode={} SampRate={}'.format(cf.ADC_Mux_Mode.get(), cf.SampRate))
+    if cf.SampRate == 200000: # Wenn Option 200 kS/s angeklickt und nur Zweierkombination aktiv
     # Mux-Mode: Welche Kombination von CA-V/-I, CB-V/-I abgetastet wird, siehe auch TraceSelectADC_Mux()
         if cf.ADC_Mux_Mode.get() == 0: # CA-V and/or CB-V
             cf.devx.set_adc_mux(1)
@@ -550,11 +464,12 @@ def SetADC_Mux():
             cf.devx.set_adc_mux(4)
         elif cf.ADC_Mux_Mode.get() == 5: # CB-V and CB-I
             cf.devx.set_adc_mux(5)
-        cf.SAMPLErate = cf.BaseSampleRate * 2 # 2x Abtastrate aktivieren
-    else: # Wenn Samplingrate <= 100.000 S/s
+    else: # cf.Two_X_Sample = 0 setzen da mehr als Zweierkombination
+        if (cf.SampRate == 200000):
+            logging.warning('SetADC_Mux(): cf.Two_X_Sample set to 0 since more than 2 channels')
+        cf.Two_X_Sample = 0
         cf.devx.set_adc_mux(0)
-        cf.SAMPLErate = cf.BaseSampleRate
-        logging.debug('SetADC_Mux() ADC_Mux_Mode={}'.format(cf.ADC_Mux_Mode.get()))
+
 
 # je nachdem welche Signale (jeweils V oder I der der beiden Kanäle A und B) abgetastet werden sollen, wird entsprechend
 # das Multiplexing des ADS gesetzt, MakeSampleRateMenu() macht das Gleiche für die Zweierkombinationen mit 2x Abtastrate
@@ -564,20 +479,48 @@ def TraceSelectADC_Mux():
         if cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # All four traces
             Alternate_Sweep_Mode = 1
+            cf.Two_X_Sample = 0
         elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 0:
             cf.ADC_Mux_Mode.set(0) # three traces
             Alternate_Sweep_Mode = 1
+            cf.Two_X_Sample = 0
         elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # three traces
             Alternate_Sweep_Mode = 1
+            cf.Two_X_Sample = 0
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # three traces
             Alternate_Sweep_Mode = 1
+            cf.Two_X_Sample = 0
         elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(0) # three traces
             Alternate_Sweep_Mode = 1
+            cf.Two_X_Sample = 0
+
+        elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 0:
+            cf.ADC_Mux_Mode.set(4) # CA-V and CA-I
+            Alternate_Sweep_Mode = 0
+        elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
+            cf.ADC_Mux_Mode.set(5) # CB-V and CB-I
+            Alternate_Sweep_Mode = 0 
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(1) # CA-I and CB-I
+            Alternate_Sweep_Mode = 0
+        elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 0:
+            cf.ADC_Mux_Mode.set(0) # CA-V and CB-V
+            Alternate_Sweep_Mode = 0        
+        elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 1:
+            cf.ADC_Mux_Mode.set(2) # CA-V and CB-I
+            Alternate_Sweep_Mode = 0        
+        elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 0:
+            cf.ADC_Mux_Mode.set(3) # CA-I and CB-V
+            Alternate_Sweep_Mode = 0
+            
+        elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 0:
+            cf.ADC_Mux_Mode.set(0) # just CA-V
+            Alternate_Sweep_Mode = 0
+        elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 0:
+            cf.ADC_Mux_Mode.set(0) # just CB-V
             Alternate_Sweep_Mode = 0
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 0:
             cf.ADC_Mux_Mode.set(1) # just CA-I
@@ -585,15 +528,15 @@ def TraceSelectADC_Mux():
         elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 1:
             cf.ADC_Mux_Mode.set(1) # just CB-I
             Alternate_Sweep_Mode = 0
-        elif cf.ShowC1_V.get() == 1 and cf.ShowC1_I.get() == 1 and cf.ShowC2_V.get() == 0 and cf.ShowC2_I.get() == 0:
-            cf.ADC_Mux_Mode.set(4) # CA-V and CA-I
-            Alternate_Sweep_Mode = 0
-        elif cf.ShowC1_V.get() == 0 and cf.ShowC1_I.get() == 0 and cf.ShowC2_V.get() == 1 and cf.ShowC2_I.get() == 1:
-            cf.ADC_Mux_Mode.set(5) # CB-V and CB-I
-            Alternate_Sweep_Mode = 0
+
         else:
             cf.ADC_Mux_Mode.set(0) # wenn nur -V und nicht zusätzlich -I abgetastet werden soll
             Alternate_Sweep_Mode = 0
+        if (cf.SampRate == 200000) and (cf.Two_X_Sample == 0): # falls während 200 kS/s Wechsel auf >Zweierkombi
+            cf.SampRate = 100000
+            cf.SampRatesb.delete(0,tk.END) # Samplinrate-Menü ändern
+            cf.SampRatesb.insert(0,cf.SampRate)
+            
         logging.debug('TraceSelectADC_Mux() with ADC_Mux_Mode = {}, Alternate_Sweep_Mode = {}'.format(cf.ADC_Mux_Mode.get(),Alternate_Sweep_Mode))
         SetADC_Mux()
         UpdateTimeTrace()

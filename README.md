@@ -20,3 +20,6 @@ Weiter wurde die quelloffene Benutzeroberfläche "Alice Desktop 1.38" (siehe wik
 
 
 ![Screenshot AliceLite](/alicelite_screenshot.png)
+
+Download der WinPython-Distribution (WinPython 3.777) inkl. der AliceLite Python-Quellcodedateien: https://www.magentacloud.de/lnk/67ABFOU8
+Download Installationsdatei für M1K-Treiber, libsmu-Bibliothek und Python-Bindings: https://www.magentacloud.de/lnk/TfgBl3C0

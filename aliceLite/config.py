@@ -35,9 +35,9 @@ SampRate = 100000 # maximaler Wert kann noch verdoppelt werden falls Mux<=2
 
 #SAMPLErate = SampRate # Scope sample rate
 SampRatesb = None # Eingabe-Spinbox für die Samplingrate
-MaxSamples = 200000 # Maximale Zahl Samples für Darstellung (# Hardwaresamples pro Loop)
+MaxSamples = 90000 # Maximale Zahl Samples für Darstellung (# Hardwaresamples pro Loop)
 Two_X_Sample = 0 # wird 1 bei 200 kS/s
-SHOWsamples = 4000 # Number of samples on the screen  
+NTrace = 4000 # Anzahl der Abtastpunkte (3x Anzeigebereich Grid)  
 MarkerNum = 0 # Zähler für die Marker bei Maus-Rechsklick im Oszibild, wird bei UpdateTimeScreen() zurückgesetzt
 
 #---Vertikaleinstellungen aus dem UI Boxes und Spinboxes
@@ -55,15 +55,12 @@ CHAIScale = CHBIScale =  50.0
 CHAIOffset = CHBIOffset = 0.0
 
 #---Horizontaleinstellungen aus dem UI Boxes und Spinboxes
-HozPossentry = None # Eingabefeld horizontale Position mS
-HozPoss = 0.0 # aktueller Wert horizontale Position
+HozPosentry = None # Eingabefeld horizontale Position mS
+HozPos = 0.0 # aktueller Wert horizontale Position
 TMsb = None # Spinbox mit Wert Horizontalskalierung
 TIMEdiv = 0.5 # aktueller Wert Horizontalskalierung
 
 #---Trigger, Cursor
-HoldOffentry = None # Eingabefenster mS für Trigger Holdoff (Totzeit)
-HoldOff = 0.0 # aktueller Wert Trigger Holdoff
-hldn = 0 # auf Arrayindex umgerechnete Holdoffzeit
 TRIGGERentry = None # Eingabefeld Triggerlevel in V bzw. mA
 TRIGGERlevel = 2.5 # Initialwert Triggerlevel in V
 TgEdge = None # Auswahl Trigger auf steigende oder fallende Flanke
@@ -154,14 +151,12 @@ Trigger_LPF_length  = tk.IntVar(0)
 Trigger_LPF_length.set(10) # Anzahl gleitender Mittelung für Trigger Tiefpassfilter
 TgInput = tk.IntVar(0)   # Trigger Input-Signal
 SingleShot = tk.IntVar(0) # Single shot triger
-ManualTrigger = tk.IntVar(0) # Manual trigger
+#ManualTrigger = tk.IntVar(0) # Manual trigger
 TgEdge = tk.IntVar(0)   # Triggerflanke steigend oder fallend
 
 #--- Abtastung, Acquire, Cursor
 ADC_Mux_Mode = tk.IntVar(0) # Wert 0...5 je nachdem welche Zweier-Signalkombination gesampelt wird
 ADC_Mux_Mode.set(0) # bis 2-fach Mux 200 kS/s falls im Samplerate-Menü ausgewählt
-#Two_X_Sample = tk.IntVar(0) 
-#Two_X_Sample.set(0) # 200 kS/s Abtastrate unter Options > Sampringrate wählbar
 TRACEaverage = tk.IntVar(0)
 TRACEaverage.set(8) # Anzahl Mittelungen Sampingperioden im Average-Modus
 TRACEmodeTime = tk.IntVar(0) # Flag für Average-Modus
@@ -193,10 +188,6 @@ MeasMinI2 = tk.IntVar(0)
 MeasMaxI2 = tk.IntVar(0)
 MeasPPI2 = tk.IntVar(0)
 MeasRMSI2 = tk.IntVar(0)
-#MeasAPER = tk.IntVar(0)
-#MeasAFREQ = tk.IntVar(0)
-#MeasBPER = tk.IntVar(0)
-#MeasBFREQ = tk.IntVar(0)
 
 #--- Arbiträrgenerator Modi (generell max 100 kS/s Aktualisierungsrate)
 AWGAMode = tk.IntVar(0) # AWG A Modus SMVI (0), SIMV (1) oder Hi-Z (2)

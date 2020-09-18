@@ -14,11 +14,8 @@ from aliceOsciFunc import (BStop, BStart, UpdateTimeAll, UpdateTimeTrace,
 UpdateTimeScreen,ReInterploateTrigger, FindTriggerSample)
 import logging
 
-VmemoryA = np.ones(1)       # The memory for averaging
-VmemoryB = np.ones(1)
-ImemoryA = np.ones(1)       # The memory for averaging
-ImemoryB = np.ones(1)
 ADsignal1 = []              # Ain signal array channel A and B
+
 TRACEresetTime = True # True for first new trace, False for averageing
 
 InOffA = InGainA = InOffB = InGainB = 0.0 # Variablen für Input aus UI
@@ -98,8 +95,6 @@ def Analog_Time_In():
 #---
 def Sample():
     global ADsignal1, Alternate_Sweep_Mode
-    global VmemoryA, VmemoryB, ImemoryA, ImemoryB
-    global HozPoss
     global TRACEresetTime
     global TIMEdiv1x
     global TRACErefresh
@@ -108,62 +103,50 @@ def Sample():
     global cha_A1Entry, cha_A2Entry, chb_A1Entry, chb_A2Entry
     global cal, Last_ADC_Mux_Mode
     global PIO_0, PIO_1, PIO_2, PIO_3, PIO_4, PIO_5, PIO_6, PIO_7
-    logging.debug("Sample() Sample Rate={} alternate_sweep_mode={} ADC_Mux_Mode={} Two_X_Sample={}".format(cf.SampRate, Alternate_Sweep_Mode,cf.ADC_Mux_Mode.get(),cf.Two_X_Sample))
+    logging.warning("Sample() Sample Rate={} alternate_sweep_mode={} ADC_Mux_Mode={} Two_X_Sample={}".format(cf.SampRate, Alternate_Sweep_Mode,cf.ADC_Mux_Mode.get(),cf.Two_X_Sample))
 
-    if cf.TRACEmodeTime.get() == 0 and TRACEresetTime == False:
+    # Anzahl Abtastpunkte 3x so viel wie darstellbar und auf 6000...90000 begrenzen  
+    cf.NTrace = int(cf.SampRate * 30.0 * cf.TIMEdiv / 1000.0)
+    if cf.NTrace > cf.MaxSamples: # or a Max of 90,000 samples
+        cf.NTrace = cf.MaxSamples
+    if cf.NTrace < 6000: # or a Min of 2000 samples
+        cf.NTrace = 6000
+    if cf.SampRate == 200000:
+        NSamp = int(cf.NTrace/2) # Da 200 kS/s via Mux realisiert werden
+    else:
+        NSamp = int(cf.NTrace)
+    logging.warning('sample(): # of Samples per Trace cf.NTace={}, NSamp={}'.format(cf.NTrace,NSamp))
+                    
+    
+    
+    VmemoryA = np.zeros(cf.NTrace)       # The memory for averaging
+    VmemoryB = np.zeros(cf.NTrace)
+    ImemoryA = np.zeros(cf.NTrace)       # The memory for averaging
+    ImemoryB = np.zeros(cf.NTrace)
+    
+    # Nach dem ersten Trace steht TRACEresetTime = False für Average-Modus
+    if cf.TRACEmodeTime.get() == 0 and TRACEresetTime == False: # Kein Average-Modus in UI und erster Trace
         TRACEresetTime = True               # Clear the memory for averaging
-    elif cf.TRACEmodeTime.get() == 1:
+    elif cf.TRACEmodeTime.get() == 1: # Average-Modus in UI und erster Trace
         if TRACEresetTime == True:
             TRACEresetTime = False
-        # Save previous trace in memory for average trace
-        VmemoryA = cf.VBuffA
-        VmemoryB = cf.VBuffB
-        ImemoryA = cf.IBuffA
-        ImemoryB = cf.IBuffB
+    # Save previous trace in memory for average trace und falls kein Triggerereignis, damit letzter Trace nochmals angezeigt wird
+    VmemoryA = cf.VBuffA
+    VmemoryB = cf.VBuffB
+    ImemoryA = cf.IBuffA
+    ImemoryB = cf.IBuffB
+    prevTRIGGERsample = cf.TRIGGERsample # wird benötigt, falls kein Triggerereignis gefunden wird
+  
 
-    try:
-        cf.HoldOff = float(eval(cf.HoldOffentry.get()))
-        if cf.HoldOff < 0:
-            cf.HoldOff = 0
-            cf.HoldOffentry.delete(0,tk.END)
-            cf.HoldOffentry.insert(0, cf.HoldOff)
-    except:
-        cf.HoldOffentry.delete(0,tk.END)
-        cf.HoldOffentry.insert(0, cf.HoldOff)
 
-    try:
-        HozPoss = float(eval(cf.HozPossentry.get()))
-    except:
-        cf.HozPossentry.delete(0,tk.END)
-        cf.HozPossentry.insert(0, HozPoss)
 
-    cf.hldn = int(cf.HoldOff * cf.SampRate/1000 )
-    hozpos = int(HozPoss * cf.SampRate/1000 )
-    if hozpos < 0:
-        hozpos = 0
-    twoscreens = int(cf.SampRate * 20.0 * cf.TIMEdiv / 1000.0) # number of samples to acquire, 2 screen widths
-    if cf.hldn+hozpos > cf.MaxSamples-twoscreens:
-        cf.hldn = cf.MaxSamples-twoscreens-hozpos
-        cf.HoldOffentry.delete(0,tk.END)
-        cf.HoldOffentry.insert(0, cf.hldn*1000/cf.SampRate)
-      
-    cf.SHOWsamples = twoscreens + cf.hldn + hozpos
-    if cf.SHOWsamples > cf.MaxSamples: # or a Max of 100,000 samples
-        cf.SHOWsamples = cf.MaxSamples
-    if cf.SHOWsamples < 2000: # or a Min of 2000 samples
-        cf.SHOWsamples = 2000
-    if hozpos >= 0:
-        cf.TRIGGERsample = cf.hldn
-    else:
-        cf.TRIGGERsample = abs(hozpos)
-    cf.TRIGGERsample = cf.TRIGGERsample + hozpos #
     # Starting acquisition
     if cf.session.continuous:
         logging.debug("Sample() session continuous")
-        ADsignal1 = cf.devx.read(cf.SHOWsamples, -1, True) # get samples for both channel A and B
+        ADsignal1 = cf.devx.read(NSamp, -1, True) # get samples for both channel A and B
         # Bei 200 kS/s sind am Ende aber doppelt so viele Samples vorhanden!
     else:
-        ADsignal1 = cf.devx.get_samples(cf.SHOWsamples) # , True) # get samples for both channel A and B
+        ADsignal1 = cf.devx.get_samples(NSamp) # , True) # get samples for both channel A and B
         # waite to finish then return to open termination
         cf.devx.ctrl_transfer( 0x40, 0x51, 32, 0, 0, 0, 100) # set CHA 2.5 V switch to open
         cf.devx.ctrl_transfer( 0x40, 0x51, 33, 0, 0, 0, 100) # set CHA GND switch to open
@@ -192,13 +175,13 @@ def Sample():
     increment = 1   
     index = 0
     
-    if cf.SHOWsamples != len(ADsignal1):
-        cf.SHOWsamples = len(ADsignal1)
+    if NSamp != len(ADsignal1): # manchmal gibt ADC weniger Samples zurück als angefordert
+        NSamp = len(ADsignal1)
         
-    while index < cf.SHOWsamples:
+    while index < NSamp:
         # 200 kS/s und <= 2 Traces (d.h.Alternate_Sweep_Mode = 0)
         if cf.Two_X_Sample == 1 and cf.ADC_Mux_Mode.get() < 6:
-            logging.debug("Sample() cf.Two_X_Sample == 1 and cf.ADC_Mux_Mode.get() < 6")
+            logging.warning("Sample() cf.Two_X_Sample == 1 and cf.ADC_Mux_Mode.get() < 6")
             if cf.ADC_Mux_Mode.get() == 0: # VA and VB
                 logging.debug("ADC_Mux_Mode.get() == 0")
                 cf.VBuffA.append(ADsignal1[index][0][0])
@@ -266,13 +249,14 @@ def Sample():
                     cf.IBuffA.append(0.0) # fill as a place holder
                     cf.IBuffA.append(0.0) # fill as a place holder
         else:
+            logging.warning("Sample() cf.Two_X_Sample != 1 and cf.ADC_Mux_Mode.get() >= 6 len(ADsignal1)={}, index={}".format(len(ADsignal1),index))
             cf.VBuffA.append(ADsignal1[index][0][0])
             cf.IBuffA.append(ADsignal1[index][0][1])
             cf.VBuffB.append(ADsignal1[index][1][0])
             cf.IBuffB.append(ADsignal1[index][1][1])
         index = index + increment
 
-    cf.SHOWsamples = len(cf.VBuffA) # bei 200 kS/s verdopplung
+    cf.NTrace = len(cf.VBuffA) # bei 200 kS/s verdopplung
      # kommt eigentlich nicht vor...
     if Alternate_Sweep_Mode == 1 and cf.Two_X_Sample == 1:
         if cf.ADC_Mux_Mode.get() == 0: # VA and VB
@@ -316,6 +300,7 @@ def Sample():
         cf.IBuffB = (cf.IBuffB - CurOffB) * CurGainB
    
 # Find trigger sample point if necessary
+    #cf.TRIGGERsample = int(cf.NTrace/3) # Triggerereignis nur im mittleren Drittel Samgling Trace suchen
     cf.LShift = 0
     if cf.TgInput.get() == 1:
         FindTriggerSample(cf.VBuffA)
@@ -325,65 +310,73 @@ def Sample():
         FindTriggerSample(cf.VBuffB)
     if cf.TgInput.get() == 4:
         FindTriggerSample(cf.IBuffB)
-    if cf.TRACEmodeTime.get() == 1 and TRACEresetTime == False:
-        # Average mode 1, add difference / TRACEaverage to array
-        if cf.TgInput.get() > 0: # if triggering left shift all arrays such that trigger point is at index 0
-            cf.LShift = 0 - cf.TRIGGERsample
-            cf.VBuffA = np.roll(cf.VBuffA, cf.LShift)
-            cf.VBuffB = np.roll(cf.VBuffB, cf.LShift)
-            cf.IBuffA = np.roll(cf.IBuffA, cf.LShift)
-            cf.IBuffB = np.roll(cf.IBuffB, cf.LShift)
-            cf.TRIGGERsample = hozpos # set trigger sample to index 0 offset by horizontal position
-        try:
-            cf.VBuffA = VmemoryA + (cf.VBuffA - VmemoryA) / cf.TRACEaverage.get()
-            cf.IBuffA = ImemoryA + (cf.IBuffA - ImemoryA) / cf.TRACEaverage.get()
-            cf.VBuffB = VmemoryB + (cf.VBuffB - VmemoryB) / cf.TRACEaverage.get()
-            cf.IBuffB = ImemoryB + (cf.IBuffB - ImemoryB) / cf.TRACEaverage.get()
-        except:
-            # buffer size mismatch so reset memory buffers
-            VmemoryA = cf.VBuffA
-            VmemoryB = cf.VBuffB
-            ImemoryA = cf.IBuffA
-            ImemoryB = cf.IBuffB
-        if cf.TgInput.get() == 1:
-            ReInterploateTrigger(cf.VBuffA)
-        if cf.TgInput.get() == 2:
-            ReInterploateTrigger(cf.IBuffA)
-        if cf.TgInput.get() == 3:
-            ReInterploateTrigger(cf.VBuffB)
-        if cf.TgInput.get() == 4:
-            ReInterploateTrigger(cf.IBuffB)
-    # DC value = average of the data record
-    Endsample = cf.SHOWsamples - 10 # average over all samples
-    ## Berechnung Messwerte im Fast Scan Modus auch für jeden Trace            
-    cf.DCV1 = np.mean(cf.VBuffA[cf.hldn:Endsample])
-    cf.DCV2 = np.mean(cf.VBuffB[cf.hldn:Endsample])
-    # convert current values to mA
-    cf.DCI1 = np.mean(cf.IBuffA[cf.hldn:Endsample])
-    cf.DCI2 = np.mean(cf.IBuffB[cf.hldn:Endsample])
-    # find min and max values
-    cf.MinV1 = np.amin(cf.VBuffA[cf.hldn:Endsample])
-    cf.MaxV1 = np.amax(cf.VBuffA[cf.hldn:Endsample])
-    cf.MinV2 = np.amin(cf.VBuffB[cf.hldn:Endsample])
-    cf.MaxV2 = np.amax(cf.VBuffB[cf.hldn:Endsample])
-    cf.MinI1 = np.amin(cf.IBuffA[cf.hldn:Endsample])
-    cf.MaxI1 = np.amax(cf.IBuffA[cf.hldn:Endsample])
-    cf.MinI2 = np.amin(cf.IBuffB[cf.hldn:Endsample])
-    cf.MaxI2 = np.amax(cf.IBuffB[cf.hldn:Endsample])
-    # RMS value = square root of average of the data record squared
-    cf.SV1 = np.sqrt(np.mean(np.square(cf.VBuffA[cf.hldn:Endsample])))
-    cf.SI1 = np.sqrt(np.mean(np.square(cf.IBuffA[cf.hldn:Endsample])))
-    cf.SV2 = np.sqrt(np.mean(np.square(cf.VBuffB[cf.hldn:Endsample])))
-    cf.SI2 = np.sqrt(np.mean(np.square(cf.IBuffB[cf.hldn:Endsample])))
-    cf.SVA_B = np.sqrt(np.mean(np.square(cf.VBuffA[cf.hldn:Endsample]-cf.VBuffB[cf.hldn:Endsample])))
 
+    if (cf.TgInput.get()==0 or cf.Is_Triggered == 1): # Falls kein Trigger oder Trigger und Triggerereignis gefunden
+        logging.warning('sample(): Trigger event found or Tigger Option None. cf.TRIGGERsample={}'.format(cf.TRIGGERsample))
+        if cf.TRACEmodeTime.get() == 1 and TRACEresetTime == False: # Average Modus und nicht erster Trace
+            if cf.TgInput.get() > 0: # if triggering left shift all arrays such that trigger point is at index 0
+                cf.LShift = - cf.TRIGGERsample
+                cf.VBuffA = np.roll(cf.VBuffA, cf.LShift)
+                cf.VBuffB = np.roll(cf.VBuffB, cf.LShift)
+                cf.IBuffA = np.roll(cf.IBuffA, cf.LShift)
+                cf.IBuffB = np.roll(cf.IBuffB, cf.LShift)
+                NHozPos = int(cf.HozPos * cf.SampRate/1000)
+                cf.TRIGGERsample = NHozPos # set trigger sample to index 0 offset by horizontal position # Wieso das?
+            try: # Neue Traces in Mittelung einberechnen
+                cf.VBuffA = VmemoryA + (cf.VBuffA - VmemoryA) / cf.TRACEaverage.get()
+                cf.IBuffA = ImemoryA + (cf.IBuffA - ImemoryA) / cf.TRACEaverage.get()
+                cf.VBuffB = VmemoryB + (cf.VBuffB - VmemoryB) / cf.TRACEaverage.get()
+                cf.IBuffB = ImemoryB + (cf.IBuffB - ImemoryB) / cf.TRACEaverage.get()
+            except:
+                # buffer size mismatch so reset memory buffers
+                VmemoryA = cf.VBuffA
+                VmemoryB = cf.VBuffB
+                ImemoryA = cf.IBuffA
+                ImemoryB = cf.IBuffB
+            if cf.TgInput.get() == 1:
+                ReInterploateTrigger(cf.VBuffA)
+            if cf.TgInput.get() == 2:
+                ReInterploateTrigger(cf.IBuffA)
+            if cf.TgInput.get() == 3:
+                ReInterploateTrigger(cf.VBuffB)
+            if cf.TgInput.get() == 4:
+                ReInterploateTrigger(cf.IBuffB)
+        # DC value = average of the data record
+        Endsample = cf.NTrace - 10 # average over all samples
+        ## Berechnung Messwerte für jeden Trace            
+        cf.DCV1 = np.mean(cf.VBuffA[10:Endsample])
+        cf.DCV2 = np.mean(cf.VBuffB[10:Endsample])
+        # convert current values to mA
+        cf.DCI1 = np.mean(cf.IBuffA[10:Endsample])
+        cf.DCI2 = np.mean(cf.IBuffB[10:Endsample])
+        # find min and max values
+        cf.MinV1 = np.amin(cf.VBuffA[10:Endsample])
+        cf.MaxV1 = np.amax(cf.VBuffA[10:Endsample])
+        cf.MinV2 = np.amin(cf.VBuffB[10:Endsample])
+        cf.MaxV2 = np.amax(cf.VBuffB[10:Endsample])
+        cf.MinI1 = np.amin(cf.IBuffA[10:Endsample])
+        cf.MaxI1 = np.amax(cf.IBuffA[10:Endsample])
+        cf.MinI2 = np.amin(cf.IBuffB[10:Endsample])
+        cf.MaxI2 = np.amax(cf.IBuffB[10:Endsample])
+        # RMS value = square root of average of the data record squared
+        cf.SV1 = np.sqrt(np.mean(np.square(cf.VBuffA[10:Endsample])))
+        cf.SI1 = np.sqrt(np.mean(np.square(cf.IBuffA[10:Endsample])))
+        cf.SV2 = np.sqrt(np.mean(np.square(cf.VBuffB[10:Endsample])))
+        cf.SI2 = np.sqrt(np.mean(np.square(cf.IBuffB[10:Endsample])))
+        cf.SVA_B = np.sqrt(np.mean(np.square(cf.VBuffA[10:Endsample]-cf.VBuffB[10:Endsample])))
+    else: # Falls kein Triggerereignis gefunden, vorherigen Trace nochmals anzeigen    
+        cf.VBuffA = VmemoryA
+        cf.VBuffB = VmemoryB
+        cf.IBuffA = ImemoryA
+        cf.IBuffB = ImemoryB
+        cf.TRIGGERsample = prevTRIGGERsample
+        logging.warning('###################sample(): No trigger event found. cf.TRIGGERsample={}'.format(cf.TRIGGERsample))
+        
     UpdateTimeAll()         # Update Data, trace and time screen
        # Update Data, trace
     if cf.SingleShot.get() > 0 and cf.Is_Triggered == 1: # Singel Shot trigger is on
         BStop()  
         cf.SingleShot.set(0)
-    if cf.ManualTrigger.get() == 1: # Manual trigger is on
-        BStop() 
     if (cf.RUNstatus.get() == 3) or (cf.RUNstatus.get() == 4):
         if cf.RUNstatus.get() == 3:
             cf.RUNstatus.set(0)
@@ -409,7 +402,7 @@ def SetSampleRate():
             cf.SampRatesb.insert(0,cf.SampRate)
         else:            
             cf.SampRate = NewRate
-            logging.debug("SetSampleRate() NewRate={} S/s".format(cf.SampRate))
+            logging.warning("SetSampleRate() NewRate={} S/s".format(cf.SampRate))
     except:
         logging.warning('Exception in SetSampleRate()')
     if NewRate == 200000:
@@ -417,7 +410,7 @@ def SetSampleRate():
     else:
         cf.Two_X_Sample = 0
     SetADC_Mux()
-    cf.session.configure(sample_rate=cf.SampRate)
+    cf.session.configure(sample_rate=cf.SampRate) # bei 200 kS/s wegen Mux nur 100 kS/s einstellen
     #cf.SampRate = cf.session.sample_rate # Wieso zurücklesen aus M1K?
     cf.SampRatesb.delete(0,tk.END)
     cf.SampRatesb.insert(0,cf.SampRate)
@@ -466,7 +459,7 @@ def SetADC_Mux():
             cf.devx.set_adc_mux(5)
     else: # cf.Two_X_Sample = 0 setzen da mehr als Zweierkombination
         if (cf.SampRate == 200000):
-            logging.warning('SetADC_Mux(): cf.Two_X_Sample set to 0 since more than 2 channels')
+            logging.debug('SetADC_Mux(): cf.Two_X_Sample set to 0 since more than 2 channels')
         cf.Two_X_Sample = 0
         cf.devx.set_adc_mux(0)
 

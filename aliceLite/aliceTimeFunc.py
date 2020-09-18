@@ -22,7 +22,7 @@ DISsamples = cf.GRW # Number of samples to display
 
 ## Make the scope time traces
 def MakeTimeTrace():
-    logging.debug('MakeTimeTrace()')
+    logging.warning('MakeTimeTrace()')
     global T1Vline, T2Vline, T1Iline, T2Iline
     global TMAVline, TMBVline, TMCVline, TMDVline
     global Tmathline, TMXline, TMYline
@@ -30,14 +30,12 @@ def MakeTimeTrace():
     global Triggerline, Triggersymbol
     global MouseCAV, MouseCAI, MouseCBV, MouseCBI    
     global SCstart, DISsamples
-    global TRACEsize
     global CurOffA, CurOffB, CurGainA, CurGainB
-    global HozPoss
-    # Set the TRACEsize variable
+
     if len(cf.VBuffA) < 100:
         return
-    TRACEsize = cf.SHOWsamples # Set the trace length
-    SCstart = 0
+
+    SCstart = 0 # Index für Zeitpunkt 0
     ylo = 0.0
     Ymin = cf.Y0T # Minimum position of time grid (top)
     Ymax = cf.Y0T + cf.GRH # Maximum position of time grid (bottom)
@@ -94,29 +92,9 @@ def MakeTimeTrace():
         cf.CHAIScale = 0.1
     if cf.CHBIScale < 0.1:
         cf.CHBIScale = 0.1
-
-    try:
-        cf.HoldOff = float(eval(cf.HoldOffentry.get()))
-        if cf.HoldOff < 0:
-            cf.HoldOff = 0
-            cf.HoldOffentry.delete(0,tk.END)
-            cf.HoldOffentry.insert(0, cf.HoldOff)
-    except:
-        cf.HoldOffentry.delete(0,tk.END)
-        cf.HoldOffentry.insert(0, cf.HoldOff)
-
-    try:
-        HozPoss = float(eval(cf.HozPossentry.get()))
-    except:
-        cf.HozPossentry.delete(0,tk.END)
-        cf.HozPossentry.insert(0, HozPoss)
-
-    cf.hldn = int(cf.HoldOff * cf.SampRate/1000 )
-    hozpos = int(HozPoss * cf.SampRate/1000 )
-    if hozpos < 0:
-        hozpos = 0        
+          
     #  drawing the traces 
-    if TRACEsize == 0: # If no trace, skip rest of this routine
+    if cf.NTrace == 0: # If no trace, skip rest of this routine
         T1Vline = []   # Trace line channel A V
         T2Vline = []   # Trace line channel B V
         T1Iline = []
@@ -124,15 +102,15 @@ def MakeTimeTrace():
         Tmathline = [] # math trce line
         return() 
     # set and/or corrected for in range
-    if cf.TgInput.get() > 0:
-        SCmin = int(-1 * cf.TRIGGERsample)
-        SCmax = int(TRACEsize - cf.TRIGGERsample - 0)
+    if cf.TgInput.get() > 0: # Trigger auf Signal aktiv (nicht None)
+        SCmin = int(-1 * cf.TRIGGERsample) # erster Index für Darstellung # Wieso negativ?
+        SCmax = int(cf.NTrace - cf.TRIGGERsample - 0) # letzter Index für Darstellung
     else:
-        SCmin = 0 # cf.hldn
-        SCmax = TRACEsize - 1
-    if SCstart < SCmin:             # No reading before start of array
+        SCmin = 0 
+        SCmax = cf.NTrace - 1
+    if SCstart < SCmin:             # Index für Zeitpunkt 0 kann nicht kleiner sein als Anfang Sample-Trace
         SCstart = SCmin
-    if SCstart  > SCmax:            # No reading after tk.END of array
+    if SCstart  > SCmax:            # Index für Zeitpunkt 0 kann nicht größer sein als Ende Sample-Trace
         SCstart = SCmax
     # Make Trace lines etc.
     Yconv1 = float(cf.GRH/10.0) / cf.CHAVScale    # Vertical Conversion factors from samples to screen points
@@ -144,17 +122,17 @@ def MakeTimeTrace():
     c2 = cf.GRH / 2.0 + cf.Y0T    # fixed correction channel B
  
     DISsamples = cf.SampRate * 10.0 * cf.TIMEdiv / 1000.0 # number of samples to display
+    # Wie kriegt man es hin, dass die Traces nur aktualisiert werden bei Trigger>None oder Triggerereignis?
     T1Vline = []                    # V Trace line channel A
     T2Vline = []                    # V Trace line channel B
     T1Iline = []                    # I Trace line channel A
     T2Iline = []                    # I Trace line channel B
-
     Tmathline = []                  # math trce line
-    #TMXline = []                    # X math Trace line
-    #TMYline = []                    # Y math Trace line
+    
     if len(cf.VBuffA) < 4 and len(cf.VBuffB) < 4 and len(cf.IBuffA) < 4 and len(cf.IBuffB) < 4:
         return
-    t = int(SCstart + cf.TRIGGERsample) # - (TriggerPos * cf.SampRate) # t = Start sample in trace
+    t = int(SCstart + cf.TRIGGERsample) # Start Index im Sample Trace für Darstellung # Hier = Triggerzeitpunkt
+    logging.warning('MakeTimeTrace(): Start Index t={}, SCstart={}, cf.TRIGGERsample={}'.format(t,SCstart,cf.TRIGGERsample))
     if t < 0:
         t = 0
     x = 0                           # Horizontal screen pixel
@@ -165,14 +143,14 @@ def MakeTimeTrace():
     ypi2 = int(c1 - YIconv2 * (cf.IBuffB[t] - cf.CHBIOffset))
     DvY1 = DvY2 = DiY1 = DiY2 = 0 
 
-    if (DISsamples <= cf.GRW):
+    if (DISsamples <= cf.GRW): # Weniger Abtastpunkte als die Breite des Grids (in Pixel)
+        logging.warning('MakeTimeTrace(): Weniger Abtastpunkte als Breite Grid')
         Xstep = cf.GRW / DISsamples
         if cf.AWGBMode.get() == 2 and cf.Two_X_Sample == 0:
             xa = int((Xstep/-2.5) - (Xstep*cf.trgIpol))
         else:
             xa = 0 - int(Xstep*cf.trgIpol) # adjust start pixel for interpolated trigger point
         x = 0 - int(Xstep*cf.trgIpol)
-        Tstep = 1
         x1 = 0 # x position of trace line
         xa1 = 0
         y1 = 0.0 # y position of trace line
@@ -188,7 +166,7 @@ def MakeTimeTrace():
         else:
             Xlimit = cf.GRW+Xstep
         while x <= Xlimit:
-            if t < TRACEsize:
+            if t < cf.NTrace:
                 xa1 = xa + cf.X0L
                 x1 = x + cf.X0L
                 y1 = int(c1 - Yconv1 * (cf.VBuffA[t] - cf.CHAVOffset))
@@ -322,16 +300,17 @@ def MakeTimeTrace():
                 MouseCAI = ypi1 - (DiY1 * (Xfine/Xstep))
                 MouseCBV = ypv2 - (DvY2 * (Xfine/Xstep))
                 MouseCBI = ypi2 - (DiY2 * (Xfine/Xstep))
-            t = int(t + Tstep)
+            t = int(t + 1)
             x = x + Xstep
             xa = xa + Xstep           
-    else: #if (DISsamples > cf.GRW): # if the number of samples is larger than the grid width need to ship over samples
+    else: # Mehr Abtastpunkte als die Breite des Grids (in Pixel)
+        logging.warning('MakeTimeTrace():Mehr Abtastpunkte als Breite Grid')
         Xstep = 1
         Tstep = DISsamples / cf.GRW      # number of samples to skip per grid pixel
         x1 = 0.0                          # x position of trace line
         ylo = 0.0                       # ymin position of trace 1 line
         yhi = 0.0                       # ymax position of trace 1 line
-        t = int(SCstart + cf.TRIGGERsample) # - (TriggerPos * cf.SampRate) # t = Start sample in trace
+        t = int(SCstart + cf.TRIGGERsample)  # Startindex des Sample Trace für Darstellung
         if t > len(cf.VBuffA)-1:
             t = 0
         if t < 0:
@@ -339,7 +318,7 @@ def MakeTimeTrace():
         x = 0               # Horizontal screen pixel
         ft = t              # time point with fractions
         while (x <= cf.GRW):
-            if (t < TRACEsize):
+            if (t < cf.NTrace):
                 if (t >= len(cf.VBuffA)):
                     t = len(cf.VBuffA)-2
                     x = cf.GRW
@@ -349,7 +328,7 @@ def MakeTimeTrace():
                 yhi = ylo
                 ihi = ilo
                 n = t
-                while n < (t + Tstep) and n < TRACEsize:
+                while n < (t + Tstep) and n < cf.NTrace:
                     if ( cf.ShowC1_V.get() == 1 ):
                         v = cf.VBuffA[t] - cf.CHAVOffset
                         if v < ylo:
@@ -400,7 +379,7 @@ def MakeTimeTrace():
                 yhi = ylo
                 ihi = ilo
                 n = t          
-                while n < (t + Tstep) and n < TRACEsize:
+                while n < (t + Tstep) and n < cf.NTrace:
                     if ( cf.ShowC2_V.get() == 1 ):
                         v = cf.VBuffB[t] - cf.CHBVOffset
                         if v < ylo:
@@ -518,6 +497,7 @@ def MakeTimeTrace():
                 x = cf.GRW
             x = x + Xstep
     # Make trigger triangle pointer
+    logging.warning('MakeTimeTrace(): Make trigger triangle pointer')
     Triggerline = []                # Trigger pointer
     Triggersymbol = []                # Trigger symbol
     if cf.TgInput.get() > 0:
@@ -580,7 +560,7 @@ def MakeTimeScreen():
     global DCI1, DCI2, CHBHW, CHBLW, CHBDCy, CHBperiod, CHBfreq
     global CurOffA, CurOffB, CurGainA, CurGainB
     global CHABphase 
-    global HozPoss
+    
     
     COLORgrid = "#808080"     # 50% Gray
     COLORzeroline = "#0000ff" # 100% blue
@@ -630,19 +610,12 @@ def MakeTimeScreen():
     except:
         cf.CHBIPosEntry.delete(0,tk.END)
         cf.CHBIPosEntry.insert(0, cf.CHBIOffset)
-    try:
-        cf.HoldOff = float(eval(cf.HoldOffentry.get()))
-        if cf.HoldOff < 0:
-            cf.HoldOff = 0
-    except:
-        cf.HoldOffentry.delete(0,tk.END)
-        cf.HoldOffentry.insert(0, cf.HoldOff)
-    # slide trace left right by HozPoss
-    try:
-        HozPoss = float(eval(cf.HozPossentry.get()))
-    except:
-        cf.HozPossentry.delete(0,tk.END)
-        cf.HozPossentry.insert(0, HozPoss)      
+    # slide trace left right by cf.HozPos
+#    try:
+#        cf.HozPos = float(eval(cf.HozPosentry.get()))
+#    except:
+#        cf.HozPosentry.delete(0,tk.END)
+#        cf.HozPosentry.insert(0, cf.HozPos)      
     # prevent divide by zero error
     if cf.CHAVScale < 0.001:
         cf.CHAVScale = 0.001
@@ -652,7 +625,7 @@ def MakeTimeScreen():
         cf.CHAIScale = 0.1
     if cf.CHBIScale < 0.1:
         cf.CHBIScale = 0.1
-    vt = cf.HoldOff + HozPoss # invert sign and scale to mSec
+    vt = cf.HozPos
     # Delete all items on the screen
     cf.ca.delete(tk.ALL) # remove all items
     # Draw horizontal grid lines
@@ -719,8 +692,8 @@ def MakeTimeScreen():
     y2 = cf.Y0T + cf.GRH
     mg_siz = cf.GRH/10.0
     mg_inc = mg_siz/5.0
-    vx = cf.TIMEdiv
-    vt = cf.HoldOff # invert sign and scale to mSec
+    vx = cf.TIMEdiv # Spaltenbreite des Oszigrids
+    vt = cf.HozPos # Offset der Zeitachsenbeschriftung infolge HorzPos-Einstellung in UI (war cf.HoldOff)
 
     while (i < 11):
         x = cf.X0L + i * cf.GRW/10.0
@@ -854,8 +827,8 @@ def MakeTimeScreen():
     txt = "Acquisition Mode: "
     if cf.TRACEmodeTime.get() == 1:
         txt = "Averaging "
-    if cf.ManualTrigger.get() == 1:
-        txt = "Manual Trigger "
+#    if cf.ManualTrigger.get() == 1:
+#        txt = "Manual Trigger "
     if (cf.RUNstatus.get() == 0) or (cf.RUNstatus.get() == 3):
         txt = "Stopped "
     # Info Samplingrate
@@ -873,12 +846,12 @@ def MakeTimeScreen():
         txt = txt + ' {0:.2f} '.format(vx * 1000.0) + " us/div"
     # Info Horizontalposition
     txt = txt + " / "
-    if abs(HozPoss) >= 1000:
-        txt = txt + str(int(HozPoss / 1000.0)) + " s "
-    if abs(HozPoss) < 1000 and abs(HozPoss) >= 1:
-        txt = txt + str(int(HozPoss)) + " ms "
-    if abs(HozPoss) < 1:
-        txt = txt + str(int(HozPoss * 1000.0)) + " us "
+    if abs(cf.HozPos) >= 1000:
+        txt = txt + str(int(cf.HozPos / 1000.0)) + " s "
+    if abs(cf.HozPos) < 1000 and abs(cf.HozPos) >= 1:
+        txt = txt + str(int(cf.HozPos)) + " ms "
+    if abs(cf.HozPos) < 1:
+        txt = txt + str(int(cf.HozPos * 1000.0)) + " us "
     # Darstellung Werte oberhalb Oszibild
     cf.ca.create_text(x, y, text=txt, anchor=tk.W, fill=cf.COLORtext)
     x2 = cf.X0L + cf.GRW

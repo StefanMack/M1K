@@ -5,8 +5,14 @@
 # Based on Code wirtten by D Mercer ()
 # https://github.com/analogdevicesinc/alice/tree/Version-1.3
 #
-# Version 0.2:
-# second release version
+# Version 0.3, third release version:
+# Math Menü nicht mehr in getrenntem Fenster
+# Horz Position = 0 entspricht Triggerzeitpunkt in der Mitte des Grids, bzw. ohne
+# Trigger dem ersten dargestellten Abtastpunkt
+# Wegfall manual Trigger
+# Bei normalem Trigger und kein Triggersignal Wiederholung des letzten Traces
+# Wegfall Trigger Hold Off, da ohnehin nur maximal einmal getriggert wird
+# Wegfall Zeitachsenbeschriftung bei aktiven Trigger
 # *****************************************************************************
 # Light Version alice-desctop 1.38, S. Mack, 15.9.2020
 # *****************************************************************************
@@ -23,23 +29,23 @@ import pysmu as smu # auskommentiert, wenn kein M1K angeschlossen
 import config as cf # hier stehen alle ehemaligen globalen Variablen drin
 from aliceIcons import hipulse, lowpulse, TBicon # Bilddateien der Icons
 # Thinter UI Menüs
-from aliceMenus import MakeSettingsMenu, MakeMathMenu, CreateToolTip, onTextKey, MakeAWGMenuInside
+from aliceMenus import MakeSettingsMenu, CreateToolTip, onTextKey, MakeAWGMenuInside
 # Samplingfunktionen des M1K
 import aliceM1kSamp as m1k
 #from aliceM1kSamp import TraceSelectADC_Mux, Analog_In
 # Oszillsokopfunktionen
 from aliceOsciFunc import (BStop, BTime, BHozPoss, BCHAlevel,
 BCHAIlevel, BCHBlevel, BCHBIlevel, BOffsetA, BIOffsetA, BOffsetB, BIOffsetB,
-BStart, UpdateTimeAll, UpdateTimeTrace, UpdateTimeScreen, BHoldOff,
+BStart, UpdateTimeAll, UpdateTimeTrace, UpdateTimeScreen,
 BTrigger50p, BTriglevel)
 
 # Nachfolgende Zeile für Debugmeldungen ausschalten (level=0 bedeutet alle Meldungen)
 # DEBUG 10, INFO 20, WARNING 30
-logging.basicConfig(level=30)
-logging.basicConfig(filename='logDatei.log', level=30)
+logging.basicConfig(level=40)
+logging.basicConfig(filename='logDatei.log', level=40)
 
-RevDate = "(12 Sep 2020)"
-SWRev = "0.2 "
+RevDate = "(18 Sep 2020)"
+SWRev = "0.3 "
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
 CHvpdiv = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
@@ -67,7 +73,7 @@ except:
 default_font = tkf.nametofont("TkDefaultFont")
 default_font.configure(size=cf.FontSize)
 
-cf.root.title("aliceLite " + SWRev + RevDate)
+cf.root.title("AliceLite " + SWRev + RevDate)
 
 img = tk.PhotoImage(data=TBicon) # Programm Icon
 hipulseimg = tk.PhotoImage(data=hipulse) # Icon für Trigger Rising Edge
@@ -135,13 +141,6 @@ def onCanvasClickRight(event): # Cursorkreuz setzen
 def onCanvasClickLeft(event):
     logging.debug("onCanvasClickLeft() x={0} y={1}".format(event.x, event.y))
     global PrevV, PrevT
-    try:
-        cf.HoldOff = float(eval(cf.HoldOffentry.get()))
-        if cf.HoldOff < 0:
-            cf.HoldOff = 0
-    except:
-        cf.HoldOffentry.delete(0,tk.END)
-        cf.HoldOffentry.insert(0, cf.HoldOff)
     # get time scale
     try:
         cf.TIMEdiv = float(eval(cf.TMsb.get()))
@@ -201,7 +200,7 @@ def onCanvasClickLeft(event):
         cf.ca.create_line(event.x-4, event.y-4,event.x+4, event.y+5, fill=cf.COLORtext)
         cf.ca.create_line(event.x+4, event.y-4,event.x-4, event.y+5, fill=cf.COLORtext)
         Tstep = (10.0 * cf.TIMEdiv) / cf.GRW # time in mS per pixel
-        Tpoint = ((event.x-cf.X0L) * Tstep) + cf.HoldOff
+        Tpoint = ((event.x-cf.X0L) * Tstep)
 
         Tpoint = Tpoint
         if Tpoint >= 1000:
@@ -442,7 +441,7 @@ Triggermenu.menu.add_radiobutton(label='CA-I', variable=cf.TgInput, value=2)
 Triggermenu.menu.add_radiobutton(label='CB-V', variable=cf.TgInput, value=3)
 Triggermenu.menu.add_radiobutton(label='CB-I', variable=cf.TgInput, value=4)
 Triggermenu.menu.add_checkbutton(label='Low Pass Filter', variable=cf.LPFTrigger)
-Triggermenu.menu.add_checkbutton(label='Manual Trgger', variable=cf.ManualTrigger)
+#Triggermenu.menu.add_checkbutton(label='Manual Trgger', variable=cf.ManualTrigger)
 Triggermenu.menu.add_checkbutton(label='SingleShot', variable=cf.SingleShot)
 Triggermenu.pack(side=tk.LEFT)
 
@@ -464,14 +463,6 @@ cf.TRIGGERentry.insert(0,2.5)
 tgb = ttk.Button(frame1, text="50%", style="W4.TButton", command=BTrigger50p)
 tgb.pack(side=tk.LEFT)
 
-hldlab = ttk.Label(frame1, text="Hold Off (ms):")
-hldlab.pack(side=tk.LEFT)
-cf.HoldOffentry = tk.Entry(frame1, width=4)
-cf.HoldOffentry.bind("<Return>", BHoldOff)
-cf.HoldOffentry.pack(side=tk.LEFT)
-cf.HoldOffentry.delete(0,tk.END)
-cf.HoldOffentry.insert(0,0.0)
-
 hint = ttk.Label(frame1, text="press <Return> to confirm")
 hint.pack(side=tk.LEFT, padx=(20,0))
 # Tooltips
@@ -479,7 +470,6 @@ Triggermenu_tip = CreateToolTip(Triggermenu, 'Trigger aktivieren, Triggerquelle 
 Edgemenu_tip = CreateToolTip(Edgemenu, 'Triggern auf steigende oder fallende Flanke')
 Triglevel_tip = CreateToolTip(cf.TRIGGERentry, 'Triggerschwelle in V bzw. mA')
 tgb_tip = CreateToolTip(tgb, 'Triggerschwelle in die Mitte zwischen Signalminimum und -maximum setzen')
-hldlab_tip = CreateToolTip(cf.HoldOffentry, 'Totzeit in ms nach Triggerereignis bevor erneut getriggert werden kann')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Oszistatus Menü
@@ -524,15 +514,16 @@ cf.TMsb.insert(0,0.5)
 cf.TMlab = ttk.Label(frame1, text="Horz Scale ms/Div:")
 cf.TMlab.pack(side=tk.RIGHT)
 
-cf.HozPossentry = tk.Entry(frame1, width=4)
-cf.HozPossentry.bind("<Return>", BHozPoss)
-cf.HozPossentry.pack(side=tk.RIGHT)
-cf.HozPossentry.delete(0,tk.END)
-cf.HozPossentry.insert(0,0.0)
+cf.HozPosentry = tk.Entry(frame1, width=4)
+cf.HozPosentry.bind("<Return>", BHozPoss)
+cf.HozPosentry.pack(side=tk.RIGHT)
+cf.HozPosentry.delete(0,tk.END)
+cf.HozPosentry.insert(0,0.0)
 hozlab = ttk.Label(frame1, text="Horz Pos (ms):")
 hozlab.pack(side=tk.RIGHT)
 # Tooltips
-hozlab_tip = CreateToolTip(cf.HozPossentry, 'Position des Triggerzeitpunkts in der Darstellung - negative Werte zeigen Signal vor dem Triggerzeitpunkt, dazu zuerst Zahl und dann Minuszeichen eingeben)')
+hozlab_tip = CreateToolTip(cf.HozPosentry, 'Horizontale Position des Triggerzeitpunkts in der Darstellung: 0 ms = Mitte.'
+                           'Für negative Werte zuerst Zahl und dann Minuszeichen eingeben. Maximal +/- 5x Zeitbasis)')
 time_tip = CreateToolTip(cf.TMsb, 'Horizontale Skalierung = Zeitbasis: Zeitabstand zwischen Gitterlinien (Div)')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -564,11 +555,10 @@ file_tip = CreateToolTip(Filemenu, 'Speichern des Oszillkopbilds als EPS-Datei o
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Options Menu
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-Optbut=Optionmenu = ttk.Menubutton(dropmenu1, text="Options", style="W7.TButton")
+Optionmenu = ttk.Menubutton(dropmenu1, text="Options", style="W7.TButton")
 Optionmenu.menu = tk.Menu(Optionmenu, tearoff = 0 )
 Optionmenu["menu"]  = Optionmenu.menu
 Optionmenu.menu.add_command(label='Settings', command=MakeSettingsMenu)
-#Optionmenu.menu.add_command(label='Sample Rate', command=MakeSampleRateMenu)
 Optionmenu.menu.add_checkbutton(label='Smooth', variable=cf.SmoothCurves, command=UpdateTimeTrace)
 Optionmenu.menu.add_checkbutton(label='Z-O-Hold', variable=cf.ZOHold, command=UpdateTimeTrace)
 Optionmenu.menu.add_checkbutton(label='Trace Avg', variable=cf.TRACEmodeTime)
@@ -576,17 +566,34 @@ Optionmenu.menu.add_radiobutton(label='Black BG', variable=cf.ColorMode, value=0
 Optionmenu.menu.add_radiobutton(label='White BG', variable=cf.ColorMode, value=1, command=BgColor)
 Optionmenu.pack(side=tk.LEFT, anchor=tk.W)
 # Tooltip für Options Button (leider keine getrennten Tooltips für Menüpunkte machbar)
-opt_tip=CreateToolTip(Optbut, 'Einstellungen, Abtastrate, Darstellungsformen, Mittelung')
+opt_tip=CreateToolTip(Optionmenu, 'Einstellungen, Abtastrate, Darstellungsformen, Mittelung')
 
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Measurments und Math menu
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#--- Drop Down Menü zur Auswahl der Messungen CHA
+#measlab = ttk.Label(frame2r, text="Measure CA / CB ")
+#measlab.pack(side=tk.TOP, anchor=tk.E)
 dropmenu2 = ttk.Frame(frame2r)
 dropmenu2.pack(side=tk.TOP, pady=(0,8))
-measlab = ttk.Label(dropmenu2, text="Meas")
-measlab.pack(side=tk.LEFT, anchor=tk.W)
+#--- Drop Down Menü zur Auswahl der Mathematikfunktionen
+mathmenu = ttk.Menubutton(dropmenu2, text="Math", style="Math.TButton")
+mathmenu.menu = tk.Menu(mathmenu, tearoff = 0 )
+mathmenu["menu"]  = mathmenu.menu
+mathmenu.menu.add_radiobutton(label='none', variable=cf.MathTrace, value=0, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CAV+CBV', variable=cf.MathTrace, value=1, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CAV-CBV', variable=cf.MathTrace, value=2, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CBV-CAV', variable=cf.MathTrace, value=3, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CAI-CBI', variable=cf.MathTrace, value=8, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CBI-CAI', variable=cf.MathTrace, value=9, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CAV*CAI', variable=cf.MathTrace, value=4, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CBV*CBI', variable=cf.MathTrace, value=5, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CAV/CAI', variable=cf.MathTrace, value=6, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CBV/CBI', variable=cf.MathTrace, value=7, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CBV/CAV', variable=cf.MathTrace, value=10, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CBI/CAI', variable=cf.MathTrace, value=11, command=UpdateTimeTrace)
+mathmenu.pack(side=tk.LEFT)
+#--- Drop Down Menü zur Auswahl der Messfunktionen CHA
 MeasmenuA = ttk.Menubutton(dropmenu2, text="CA", style="W3.TButton")
 MeasmenuA.menu = tk.Menu(MeasmenuA, tearoff = 0 )
 MeasmenuA["menu"]  = MeasmenuA.menu
@@ -604,7 +611,7 @@ MeasmenuA.menu.add_checkbutton(label='Max', variable=cf.MeasMaxI1)
 MeasmenuA.menu.add_checkbutton(label='P-P', variable=cf.MeasPPI1)
 MeasmenuA.menu.add_checkbutton(label='RMS', variable=cf.MeasRMSI1)
 MeasmenuA.pack(side=tk.LEFT)
-#--- Drop Down Menü zur Auswahl der Messungen CHB
+#--- Drop Down Menü zur Auswahl der Messfunktionen CHB
 MeasmenuB = ttk.Menubutton(dropmenu2, text="CB", style="W3.TButton")
 MeasmenuB.menu = tk.Menu(MeasmenuB, tearoff = 0 )
 MeasmenuB["menu"]  = MeasmenuB.menu
@@ -623,12 +630,13 @@ MeasmenuB.menu.add_checkbutton(label='P-P', variable=cf.MeasPPI2)
 MeasmenuB.menu.add_checkbutton(label='RMS', variable=cf.MeasRMSI2)
 MeasmenuB.pack(side=tk.LEFT)
 
-mathbt = ttk.Button(dropmenu2, text="Math", style="Math.TButton", command = MakeMathMenu)
-mathbt.pack(side=tk.RIGHT, anchor=tk.W)
+measlab = ttk.Label(dropmenu2, text="Meas\n CA/CB")
+measlab.pack(side=tk.LEFT)
+
 # Tooltips
 measA_tip=CreateToolTip(MeasmenuA, 'Messfunktionen wie Mittelwert, RMS für Kanal A')
 measB_tip=CreateToolTip(MeasmenuB, 'Messfunktionen wie Mittelwert, RMS für Kanal B')
-math_tip = CreateToolTip(mathbt, 'Mathematikfunktionen auf Signalverläufe')
+math_tip = CreateToolTip(mathmenu, 'Mathematikfunktionen auf Signalverläufe')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Menü zur Anzeige der Traces

@@ -2,16 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 13.9.20
+S. Mack, 22.9.20
 """
 
 import tkinter as tk
 import tkinter.ttk as ttk # nötig für Widget Styles
-import platform
+#import platform
 from aliceAwgFunc import UpdateAwgCont
 from aliceAwgFunc import UpdateAWGA
 from aliceAwgFunc import UpdateAWGB
-from aliceOsciFunc import UpdateTimeTrace
 import config as cf
 import logging
 
@@ -103,61 +102,16 @@ SampleRatewindow = None
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #Tkinter Callback-Funktionen
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Use Arrow keys to inc dec entry values
-def onTextKey(event):
-    logging.debug('onTextKey()')
-    button = event.widget
-    cursor_position = button.index(tk.INSERT) # get current cursor position
-    Pos = cursor_position
-    OldVal = button.get() # get current entry string
-    OldValfl = float(OldVal) # and its value
-    Len = len(OldVal)
-    Dot = OldVal.find (".")  # find decimal point position
-    Decimals = Len - Dot - 1
-    if Dot == -1 : # no point
-        Decimals = 0             
-        Step = 10**(Len - Pos)
-    elif Pos <= Dot : # no point left of position
-        Step = 10**(Dot - Pos)
-    else:
-        Step = 10**(Dot - Pos + 1)
-    if platform.system() == "Windows":
-        if event.keycode == 38: # increment digit for up arrow key
-            NewVal = OldValfl + Step
-        elif event.keycode == 40: # decrement digit for down arrow
-            NewVal = OldValfl - Step
-        else:
-            return
-    elif platform.system() == "Linux":
-        if event.keycode == 111: # increment digit for up arrow key
-            NewVal = OldValfl + Step
-        elif event.keycode == 116: # decrement digit for down arrow
-            NewVal = OldValfl - Step
-        else:
-            return
-
-    FormatStr = "{0:." + str(Decimals) + "f}"
-    NewStr = FormatStr.format(NewVal)
-    NewDot = NewStr.find (".") 
-    NewPos = Pos + NewDot - Dot
-    if Decimals == 0 :
-        NewLen = len(NewStr)
-        NewPos = Pos + NewLen - Len
-    button.delete(0, tk.END) # remove old entry
-    button.insert(0, NewStr) # insert new entry
-    button.icursor(NewPos) # resets the insertion cursor
-
 def onSettingsTextKey(event):
     logging.debug('onSettingsTextKey()')
-    onTextKey(event)
     UpdateSettingsMenu()        
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Tkinter UI Menüs aufbauen
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #--- AWG Menü im Hauptfenster
-def MakeAWGMenuInside():
-    logging.debug('MakeAWGMenuInside()')
+def MakeAWGMenu():
+    logging.debug('MakeAWGMenu()')
     global amp1lab, amp2lab, off1lab, off2lab
     # AWGA: Menü
     ModeAMenu = ttk.Menubutton(cf.AWGAMenus, text="Mode", style="W5.TButton")
@@ -312,10 +266,10 @@ def MakeSettingsMenu():
         AvgMode.grid(row=1, column=1, sticky=tk.W)
         TAvg = tk.Entry(AvgMode, width=4)
         TAvg.bind("<Return>", onSettingsTextKey)
-        TAvg.bind('<Key>', onSettingsTextKey)
+        #TAvg.bind('<Key>', onSettingsTextKey)
         TAvg.pack(side=tk.RIGHT)
         TAvg.delete(0,tk.END)
-        TAvg.insert(0,cf.TRACEaverage.get())
+        TAvg.insert(0,cf.NAveTrace.get())
       
         Twdthlab = ttk.Label(frame1, text="Trace Width in Pixels", style= "A10B.TLabel")
         Twdthlab.grid(row=4, column=0, sticky=tk.W)
@@ -323,7 +277,7 @@ def MakeSettingsMenu():
         TwdthMode.grid(row=4, column=1, sticky=tk.W)
         TwdthE = tk.Entry(TwdthMode, width=4)
         TwdthE.bind("<Return>", onSettingsTextKey)
-        TwdthE.bind('<Key>', onSettingsTextKey)
+        #TwdthE.bind('<Key>', onSettingsTextKey)
         TwdthE.pack(side=tk.RIGHT)
         TwdthE.delete(0,tk.END)
         TwdthE.insert(0,cf.TRACEwidth.get())
@@ -334,7 +288,7 @@ def MakeSettingsMenu():
         GwdthMode.grid(row=5, column=1, sticky=tk.W)
         GwdthE = tk.Entry(GwdthMode, width=4)
         GwdthE.bind("<Return>", onSettingsTextKey)
-        GwdthE.bind('<Key>', onSettingsTextKey)
+        #GwdthE.bind('<Key>', onSettingsTextKey)
         GwdthE.pack(side=tk.RIGHT)
         GwdthE.delete(0,tk.END)
         GwdthE.insert(0,cf.GridWidth.get())
@@ -345,14 +299,21 @@ def MakeSettingsMenu():
         TrgLPFMode.grid(row=6, column=1, sticky=tk.W)
         TrgLPFEntry = tk.Entry(TrgLPFMode, width=4)
         TrgLPFEntry.bind("<Return>", onSettingsTextKey)
-        TrgLPFEntry.bind('<Key>', onSettingsTextKey)
+        #TrgLPFEntry.bind('<Key>', onSettingsTextKey)
         TrgLPFEntry.pack(side=tk.RIGHT)
         TrgLPFEntry.delete(0,tk.END)
         TrgLPFEntry.insert(0,cf.Trigger_LPF_length.get())
+        
+        hint = ttk.Label(frame1, text="press <Return> to confirm")
+        hint.grid(row=7, column=0, sticky=tk.W)
        
         Settingsdismissbutton = ttk.Button(frame1, text="Close Window", style= "W12.TButton", command=DestroySettingsMenu)
         Settingsdismissbutton.grid(row=12, column=0, sticky=tk.W, pady=7)
-    
+        
+        CreateToolTip(TrgLPFEntry, 'Tiefpassfilter für das Triggereingangssignal: Anzahl Samples über die gemittelt wird (2..8).')
+        CreateToolTip(TAvg, 'Mittelung über mehrere Abtastperioden: Anzahl Perioden über die gemittelt wird (2...16).')
+        
+        
 def UpdateSettingsMenu():
     logging.debug('UpdateSettingsMenu()')
     global Settingswindow, TAvg, TwdthE, GwdthE
@@ -369,23 +330,25 @@ def UpdateSettingsMenu():
             GwdthE.delete(0,tk.END)
             GwdthE.insert(0, int(GW))
     except:
+        GW = 1
         GwdthE.delete(0,tk.END)
-        GwdthE.insert(0, cf.GridWidth.get())
+        GwdthE.insert(0, GW)    
     cf.GridWidth.set(GW)
 
     try:
         T_length = int(eval(TrgLPFEntry.get()))
-        if T_length < 1:
-            T_length = 1
+        if T_length < 2:
+            T_length = 2
             TrgLPFEntry.delete(0,tk.END)
-            TrgLPFEntry.insert(0, int(GW))
-        if T_length > 100:
-            T_length = 100
+            TrgLPFEntry.insert(0, int(T_length))
+        if T_length > 8:
+            T_length = 8
             TrgLPFEntry.delete(0,tk.END)
-            TrgLPFEntry.insert(0, int(GW))
+            TrgLPFEntry.insert(0, int(T_length))
     except:
+        T_length = 2
         TrgLPFEntry.delete(0,tk.END)
-        TrgLPFEntry.insert(0, cf.Trigger_LPF_length.get())
+        TrgLPFEntry.insert(0, T_length)
     cf.Trigger_LPF_length.set(T_length)
 
     try:
@@ -399,14 +362,15 @@ def UpdateSettingsMenu():
             TwdthE.delete(0,tk.END)
             TwdthE.insert(0, int(TW))
     except:
+        TW = 1
         TwdthE.delete(0,tk.END)
-        TwdthE.insert(0, cf.TRACEwidth.get())
+        TwdthE.insert(0, TW)
     cf.TRACEwidth.set(TW)
 
     try:
         TA = int(eval(TAvg.get()))
-        if TA < 1:
-            TA = 1
+        if TA < 2:
+            TA = 2
             TAvg.delete(0,tk.END)
             TAvg.insert(0, int(TA))
         if TA > 16:
@@ -414,9 +378,10 @@ def UpdateSettingsMenu():
             TAvg.delete(0,tk.END)
             TAvg.insert(0, int(TA))
     except:
+        TA = 2
         TAvg.delete(0,tk.END)
-        TAvg.insert(0, cf.TRACEaverage.get())
-    cf.TRACEaverage.set(TA)
+        TAvg.insert(0, TA)
+    cf.NAveTrace.set(TA)
 
 def DestroySettingsMenu():
     logging.debug('DestroySettingsMenu()')

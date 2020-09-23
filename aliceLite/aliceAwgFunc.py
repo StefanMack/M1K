@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 15.9.20
+S. Mack, 22.9.20
 
 AWGXMaxvalue war vormals AWGXOffsetvalue
 AWGXMinvalue war vormals AWGXAmplvalue

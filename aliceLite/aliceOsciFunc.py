@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 15.9.20
+S. Mack, 22.9.20
 """
 import math
 import time
@@ -35,19 +35,14 @@ def BStop():
     UpdateTimeScreen()          # Always Update screens as necessary
 
 # Set Hor time scale from entry widget
-def BTime():
-    logging.debug('BTime()')
+def BTime(*event): # * damit mit und ohne Übergabe von Argumenten (z.B. Event)
     try: # get time scale in mSec/div
         cf.TIMEdiv = float(eval(cf.TMsb.get()))
-        if cf.TIMEdiv < 0.0002:
-            cf.TIMEdiv = 0.01
-            cf.TMsb.delete(0,"end")
-            cf.TMsb.insert(0,cf.TIMEdiv)
     except:
         cf.TIMEdiv = 0.5
         cf.TMsb.delete(0,"end")
         cf.TMsb.insert(0,cf.TIMEdiv)
-
+    logging.debug('BTime() with TIMEdiv={}'.format(cf.TIMEdiv))
     if cf.RUNstatus.get() == 2:      # Restart if running
         cf.RUNstatus.set(4)
     UpdateTimeTrace()           # Always Update
@@ -73,77 +68,6 @@ def BHozPoss(event):
         cf.HozPosentry.delete(0,tk.END)
         cf.HozPosentry.insert(0, cf.HozPos)
 
-def BCHAlevel():
-    logging.debug('BCHAlevel()')
-    try:
-        CH1vpdvLevel = float(eval(cf.CHAsb.get()))
-    except:
-        cf.CHAsb.delete(0,tk.END)
-        cf.CHAsb.insert(0, CH1vpdvLevel)
-    UpdateTimeTrace()           # Always Update
-
-def BCHAIlevel():
-    logging.debug('BCHAIlevel()')
-    try:
-        CH1ipdvLevel = float(eval(cf.CHAIsb.get()))
-    except:
-        cf.CHAIsb.delete(0,tk.END)
-        cf.CHAIsb.insert(0, CH1ipdvLevel)
-    UpdateTimeTrace()           # Always Update
-
-def BCHBlevel():
-    logging.debug('BCHBlevel()')
-    try:
-        CH2vpdvLevel = float(eval(cf.CHBsb.get()))
-    except:
-        cf.CHBsb.delete(0,tk.END)
-        cf.CHBsb.insert(0, CH2vpdvLevel)
-    UpdateTimeTrace()           # Always Update    
-
-def BCHBIlevel():
-    logging.debug('BCHBIlevel()')
-    try:
-        CH2ipdvLevel = float(eval(cf.CHBIsb.get()))
-    except:
-        cf.CHBIsb.delete(0,tk.END)
-        cf.CHBIsb.insert(0, CH2ipdvLevel)
-    UpdateTimeTrace()           # Always Update    
-
-def BOffsetA(event):
-    logging.debug('BOffsetA()')
-    try:
-        CHAVOffset = float(eval(cf.CHAVPosEntry.get()))
-    except:
-        cf.CHAVPosEntry.delete(0,tk.END)
-        cf.CHAVPosEntry.insert(0, CHAVOffset)
-    UpdateTimeTrace()           # Always Update
-
-def BIOffsetA(event):
-    logging.debug('BIOffsetA()')
-    try:
-        CHAIOffset = float(eval(cf.CHAIPosEntry.get()))
-    except:
-        cf.CHAIPosEntry.delete(0,tk.END)
-        cf.CHAIPosEntry.insert(0, CHAIOffset)
-    UpdateTimeTrace()           # Always Update
-
-def BOffsetB(event):
-    logging.debug('BOffsetB()')
-    try:
-        CHBVOffset = float(eval(cf.CHBVPosEntry.get()))
-    except:
-        cf.CHBVPosEntry.delete(0,tk.END)
-        cf.CHBVPosEntry.insert(0, CHBVOffset)
-    UpdateTimeTrace()           # Always Update
-
-def BIOffsetB(event):
-    logging.debug('BIOffsetB()')
-    try:
-        CHBIOffset = float(eval(cf.CHBIPosEntry.get()))
-    except:
-        cf.CHBIPosEntry.delete(0,tk.END)
-        cf.CHBIPosEntry.insert(0, CHBIOffset)
-    UpdateTimeTrace()           # Always Update
 
 ## Start aquaring scope time data
 def BStart():
@@ -164,10 +88,6 @@ def BStart():
                 cf.session.start(0)
             time.sleep(0.02) # wait awhile here for some reason                   
     UpdateTimeScreen()          # Always Update
-#    if cf.TIMEdiv >= 100:
-#        First_Slow_sweep = 0
-#    else:
-#        First_Slow_sweep = 1
       
 ## Update Data, trace and time screen
 def UpdateTimeAll():
@@ -176,21 +96,32 @@ def UpdateTimeAll():
     UpdateTimeScreen()      # Update the screen 
 
 ## Update time trace and screen
-def UpdateTimeTrace():      
-    logging.debug('UpdateTimeTrace()')
+def UpdateTimeTrace():     
+    logging.debug('UpdateTimeTrace() with MathTrace={}'.format(cf.MathTrace.get()))
+    # Prüfen of für gewählten Mathtrace nötige CA/CB Traces aktiv
+    if cf.MathTrace.get() in [1,2,3,10]: # Kombi CA-V, CB-V
+        if (cf.ShowC1_V.get() and cf.ShowC2_V.get()) == 0: # falls nicht
+            cf.MathTrace.set(0) # Math Trace ausschalten
+    if cf.MathTrace.get() in [8,9,11]: # Kombi CA-I, CB-I
+        if (cf.ShowC1_I.get() and cf.ShowC2_I.get()) == 0:
+            cf.MathTrace.set(0)
+    if cf.MathTrace.get() in [4,6]: # Kombi CA-V, CA-I
+        if (cf.ShowC1_V.get() and cf.ShowC1_I.get()) == 0:
+            cf.MathTrace.set(0)
+    if cf.MathTrace.get() in [5,7]: # Kombi CB-V, CB-I
+        if (cf.ShowC2_V.get() and cf.ShowC2_I.get()) == 0:
+            cf.MathTrace.set(0)
     MakeTimeTrace()         # Update traces
     UpdateTimeScreen()      # Update the screen
 
-# Update time screen with trace and text: Nur wenn Trigger>None oder Triggerereignis (noch nicht optimal)
+# Update time screen with trace and text
 def UpdateTimeScreen():
-    if True:
-    #if (cf.Is_Triggered == 1 and cf.TgInput.get() > 0) or (cf.TgInput.get() == 0):
-        logging.debug('UpdateTimeScreen()')
-        MakeTimeScreen() # Update the screen
-        cf.MarkerNum = 0 # Marker wurden durch MakeTimeScreen() gelöscht, jetzt noch Position 1. Marker wieder zurücksetzen 
-        if cf.running == 1: # damit keine Fehlermeldung bei Exit mit laufendem Oszi
-            cf.root.update() # Activate updated screens
-            #cf.root.update_idletasks() # Wieso ist das hier nötig?
+    logging.debug('UpdateTimeScreen()')
+    MakeTimeScreen() # Update the screen
+    cf.MarkerNum = 0 # Marker wurden durch MakeTimeScreen() gelöscht, jetzt noch Position 1. Marker wieder zurücksetzen 
+    if cf.running == 1: # damit keine Fehlermeldung bei Exit mit laufendem Oszi
+        cf.root.update() # Activate updated screens
+        #cf.root.update_idletasks() # Wieso ist das hier nötig?
     
     
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -228,20 +159,22 @@ def BTriglevel(event):
         cf.TRIGGERentry.delete(0,tk.END)
         cf.TRIGGERentry.insert(0, cf.TRIGGERlevel)
     # set new trigger level 
-    logging.warning('BTriglevel() with cf.TRIGGERlevel={}'.format(cf.TRIGGERlevel))
+    logging.debug('BTriglevel() with cf.TRIGGERlevel={}'.format(cf.TRIGGERlevel))
     UpdateTimeTrace()           # Always Update
 
 
 # Interpolate time between samples around trigger event
+# Im Averagemodus Triggerzeitpunkt aktueller Mittelwert interpolieren
 def ReInterploateTrigger(TrgBuff):
-    logging.debug('ReInterploateTrigger()')
     cf.trgIpol = 0
-    n = cf.TRIGGERsample
-    DY = TrgBuff[int(n)] - TrgBuff[int(n+1)]
-    if DY != 0.0:
-        cf.trgIpol = (cf.TRIGGERlevel - TrgBuff[int(n+1)])/DY # calculate interpolated trigger point
+    n = cf.TRIGGERsample # Index letzter Wert unterhalb (+) bzw. oberhalb (-) Schwelle
+    deltaY = TrgBuff[int(n+1)] - TrgBuff[int(n)] # Differenz Signal direkt unter/über (+) Schwelle
+    logging.debug('ReInterploateTrigger(): TrgBuff[n]={} TrgBuff[n+1]={} deltaY={}'.format(TrgBuff[int(n)],TrgBuff[int(n+1)],deltaY))
+    if abs(deltaY) > 0.01:
+        cf.trgIpol = (TrgBuff[int(n+1)]-cf.TRIGGERlevel)/deltaY # calculate interpolated trigger point
     else:
         cf.trgIpol = 0
+    logging.debug('ReInterploateTrigger(): cf.trgIpol={}'.format(cf.trgIpol))
 
 # Innerhalb der ersten 2/3 der Abtastpunkte wird nach Triggerereignis gesucht
 def FindTriggerSample(TrgBuff):
@@ -265,43 +198,37 @@ def FindTriggerSample(TrgBuff):
     try:
         TrgMax = np.amax(TrgBuff) # größter Signalwert
     except:
-        TrgMax = 0.0
-    try: # Trigger Level aus UI lesen
-        cf.TRIGGERlevel = float(eval(cf.TRIGGERentry.get()))
-    except:
-        cf.TRIGGERentry.delete(0,tk.END)
-        cf.TRIGGERentry.insert(0, cf.TRIGGERlevel)
-    try: # Horizontaloffset aus UI lesen
-        cf.HozPos = float(eval(cf.HozPosentry.get()))
-    except:
-        cf.HozPosentry.delete(0,tk.END)
-        cf.HozPosentry.insert(0, cf.HozPos)    
+        TrgMax = 0.0   
     # Umrechnen in Indexwert
-    NHozPos = int(cf.HozPos * cf.SampRate/1000)
+    #NHozPos = int(cf.HozPos * cf.SampRate/1000)
    
-    cf.trgIpol = 0
-    n = int(cf.NTrace * 0.25) # Startindex für Triggersuche
-    Nmax = int(cf.NTrace * 0.75) # Endindex für Triggersuche
+    n = int(cf.NSamples * 0.25) # Startindex für Triggersuche
+    Nmax = int(cf.NSamples * 0.75) # Endindex für Triggersuche
+    
     # Triggern auf steigender Flanke:
-    TRIGGERlevel2 = 0.99 * cf.TRIGGERlevel # Hystere Trigger  
-    if TRIGGERlevel2 < TrgMin: # Hystereseintervall auf min/max Signalwert begrenzen
-        TRIGGERlevel2 = TrgMin
-    if TRIGGERlevel2 > TrgMax:
-        TRIGGERlevel2 = TrgMax
-    ChInput = TrgBuff[int(n)]
-    Prev = ChInput
-    while ( ChInput >= TRIGGERlevel2) and n < Nmax: # erster Signalwert s_min kleiner 99 % Trigger Level
-        n = n + 1
+    if cf.TgEdge.get() == 0:
+        TRIGGERlevel2 = 0.99 * cf.TRIGGERlevel # Hystere Trigger  
+        if TRIGGERlevel2 < TrgMin: # Hystereseintervall auf min/max Signalwert begrenzen
+            TRIGGERlevel2 = TrgMin
+        if TRIGGERlevel2 > TrgMax:
+            TRIGGERlevel2 = TrgMax
         ChInput = TrgBuff[int(n)]
-    while (ChInput <= cf.TRIGGERlevel) and n < Nmax: # darauf folgender erster Signalwert s_max größer Trigger Level 
-        Prev = ChInput # = s_min
-        n = n + 1
-        ChInput = TrgBuff[int(n)] # = s_max
-    DY = ChInput - Prev # Differenz erste Signalwerte unter- und oberhalb Triggerintervall
-    if DY != 0.0:
-        cf.trgIpol = (cf.TRIGGERlevel - Prev)/DY # %-Wert Lage Trigger Level im Intervall [s_min,s_max]
-    else:
-        cf.trgIpol = 0
+        SampBelow = ChInput
+        while (ChInput >= TRIGGERlevel2) and n < Nmax: # Iterieren bis Signalwert kleiner 99 % Trigger Level
+            n = n + 1
+            ChInput = TrgBuff[int(n)]
+        while (ChInput <= cf.TRIGGERlevel) and n < Nmax: 
+            SampBelow = ChInput # Ende while: Letzter Signalwert unterhalb Triggerschwelle
+            n = n + 1 # Ende while: Index erster Signalwert oberhalb Triggerschwelle
+            ChInput = TrgBuff[int(n)] # Ende while: Erster Signalwert oberhalb Triggerschwelle
+        if n < Nmax: # Triggerereignis gefunden
+            deltaY = ChInput - SampBelow # Differenz Signalwerte direkt ober- und unterhalb Triggerschwelle, immer positiv
+            if deltaY != 0.0:
+                cf.trgIpol = (cf.TRIGGERlevel - SampBelow)/deltaY # relative Lage Trigger Level im Intervall [s_min,s_max] 0: SampBelow liegt auf Triggerschwelle
+                logging.debug('Trigger rising edge: SampBelow={}, deltaY={}, cf.trgIpol={}'.format(SampBelow,deltaY,cf.trgIpol))
+            else:
+                logging.debug('Trigger rising edge: deltaY = 0.0')
+                cf.trgIpol = 0
     # Triggern auf fallende Flanke, Algorithmus sonst wie oben
     if cf.TgEdge.get() == 1:
         TRIGGERlevel2 = 1.01 * cf.TRIGGERlevel
@@ -310,28 +237,27 @@ def FindTriggerSample(TrgBuff):
         if TRIGGERlevel2 > TrgMax:
             TRIGGERlevel2 = TrgMax
         ChInput = TrgBuff[int(n)]
-        Prev = ChInput
-        while (ChInput <= TRIGGERlevel2) and n < Nmax: # erster Signalwert größer 101 % Trigger Level
+        SampAbove = ChInput
+        while (ChInput <= TRIGGERlevel2) and n < Nmax: # Iterieren bis Signalwert größer 101 % Trigger Level
             n = n + 1
             ChInput = TrgBuff[int(n)]
-        while (ChInput >= cf.TRIGGERlevel) and n < Nmax: # darauf folgender erster Signalwert kleiner Triggerlevel
-            Prev = ChInput
-            n = n + 1
-            ChInput = TrgBuff[int(n)]
-        DY = Prev - ChInput
-        try:
-            cf.trgIpol = (Prev - cf.TRIGGERlevel)/DY # calculate interpolated trigger point
-        except:
-            cf.trgIpol = 0
+        while (ChInput >= cf.TRIGGERlevel) and n < Nmax: # Triggerereignis finden
+            SampAbove = ChInput # Ende while: Letzter Signalwert oberhalb Schwelle
+            n = n + 1 # Ende while: Index erster Signalwert unterhalb Schwelle
+            ChInput = TrgBuff[int(n)] # Ende while: Erster Signalwert unterhalb Schwelle
+        if n < Nmax: # Triggerereignis gefunden 
+            deltaY = SampAbove - ChInput # Differenz Signalwerte direkt ober- und unterhalb Triggerschwelle, immer positiv
+            if deltaY != 0.0:
+                cf.trgIpol = (SampAbove - cf.TRIGGERlevel)/deltaY # calculate interpolated trigger point
+            else:
+                cf.trgIpol = 0
             
     if n < Nmax: # Tiggerereignis innerhalb 0..Nmax (erste 2/3 der Abtastpunkte)
-        logging.warning('FindTriggerSample(TrgBuff): Found trigger event.')
-        cf.TRIGGERsample = n - 1 # Indexposition des Triggerereignisses
+        cf.TRIGGERsample = n - 1 # Indexposition des Triggerereignisses: letzter unterhalb (+) bzw. oberhalb (-) Schwelle
         cf.Is_Triggered = 1
-        # Triggerzeitpunkt in Mitte des Grids setzen, falls Horz Pos 0 0 ms
-        cf.TRIGGERsample = cf.TRIGGERsample + NHozPos - int(cf.SampRate * 5.0 * cf.TIMEdiv / 1000.0) 
+        logging.debug('FindTriggerSample(): Found raw trigger event: Index TRIGGERsample={}'.format(cf.TRIGGERsample))
     elif n >= Nmax: # Didn't find edge in first 2/3 of data set
-        logging.warning('FindTriggerSample(TrgBuff): Found **no** trigger event.')
+        logging.debug('FindTriggerSample(): Found **no** trigger event.')
         cf.TRIGGERsample = 0 # war 1
         cf.Is_Triggered = 0
     if cf.trgIpol > 1:
@@ -340,5 +266,4 @@ def FindTriggerSample(TrgBuff):
         cf.trgIpol = 0 # never less than 0% of a sample period
     if math.isnan(cf.trgIpol):
         cf.trgIpol = 0
-    # Triggerzeitpunkt in Mitte des Grids setzen, falls Horz Pos 0 0 ms
-    #cf.TRIGGERsample = cf.TRIGGERsample + NHozPos - int(cf.SampRate * 5.0 * cf.TIMEdiv / 1000.0) 
+    logging.debug('FindTriggerSample(): cf.trgIpol={}'.format(cf.trgIpol))

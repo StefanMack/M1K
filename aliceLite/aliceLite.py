@@ -5,16 +5,29 @@
 # Based on Code wirtten by D Mercer ()
 # https://github.com/analogdevicesinc/alice/tree/Version-1.3
 #
-# Version 0.3, third release version:
-# Math Menü nicht mehr in getrenntem Fenster
-# Horz Position = 0 entspricht Triggerzeitpunkt in der Mitte des Grids, bzw. ohne
-# Trigger dem ersten dargestellten Abtastpunkt
-# Wegfall manual Trigger
-# Bei normalem Trigger und kein Triggersignal Wiederholung des letzten Traces
-# Wegfall Trigger Hold Off, da ohnehin nur maximal einmal getriggert wird
-# Wegfall Zeitachsenbeschriftung bei aktiven Trigger
+# Version 0.4, fourth release version:
+# Unsinnige Eingaben Trace/Grid Width abfangen >OK
+# Number of Samples über den Grid angeben >OK
+# 0,2 ms/Div und Trace Average stabil machen >OK
+# Bei Cursor Tooltip explizit Rechts-/Links-Klick erklären >OK
+# Export CSV-Datei Zeit "s" statt "ms" >OK
+# Spinbox mit Samplingraten 200.000, 100.000, 50.000, 20.000, 10.000, 5.000 >OK
+# Unsinnige Eingaben Calibrate CA-I/CB-I genau wie bei CV abfangen >OK
+# 200 kS/s nicht direkt an devx weitergeben >OK
+# Divide by zero für DY abfangen, DY in deltaY umbenennen >OK
+# Bei "Not Triggered" soll Trace nicht mehr wackeln >OK
+# "Not Triggered" und "Stopped" über Grid auffälliger mit '++  ++' darstellen >OK
+# Math-Trace nur darstellen wenn CA und CB aktiv >OK
+# Tooltips bei Eingabefelder Menüpunkt Settings von Options >OK
+# Eingabefenster Horz. Scale nur in Liste vorgegebene Werte zulassen >OK
+# Eingabefenster reagieren nur auf <return> und nicht schon auf Texteingabe (so wie im AWG-Munü) >OK
+# Bei mehr Abtastpunkten als Darstellungspixel und Z-O-Hold und Math Absturz >OK
+# Bei Einstellungen Vertikal/Horizontalskalierung bzw. -offset sWerte jeweils rechts neben den Bezeichnern erscheinen >OK
+
+# Strommessung: CA unc CB 50 mA erscheinen beu 200 kS/s als 250 mA egal ob DC oder Sinussignal
+
 # *****************************************************************************
-# Light Version alice-desctop 1.38, S. Mack, 15.9.2020
+# Light Version alice-desctop 0.4, S. Mack, 23.9.2020
 # *****************************************************************************
 
 import time
@@ -24,35 +37,31 @@ import tkinter.font as tkf
 import tkinter.messagebox as tkm
 import tkinter.ttk as ttk # nötig für Widget Styles
 from tkinter.filedialog import asksaveasfilename
-#root=tk.Tk() # steht jetzt in config.py da sonst dort nicht Instanziert werden kann
 import pysmu as smu # auskommentiert, wenn kein M1K angeschlossen
 import config as cf # hier stehen alle ehemaligen globalen Variablen drin
 from aliceIcons import hipulse, lowpulse, TBicon # Bilddateien der Icons
 # Thinter UI Menüs
-from aliceMenus import MakeSettingsMenu, CreateToolTip, onTextKey, MakeAWGMenuInside
+from aliceMenus import MakeSettingsMenu, CreateToolTip, MakeAWGMenu
 # Samplingfunktionen des M1K
 import aliceM1kSamp as m1k
-#from aliceM1kSamp import TraceSelectADC_Mux, Analog_In
 # Oszillsokopfunktionen
-from aliceOsciFunc import (BStop, BTime, BHozPoss, BCHAlevel,
-BCHAIlevel, BCHBlevel, BCHBIlevel, BOffsetA, BIOffsetA, BOffsetB, BIOffsetB,
+from aliceOsciFunc import (BStop, BTime, BHozPoss,
 BStart, UpdateTimeAll, UpdateTimeTrace, UpdateTimeScreen,
 BTrigger50p, BTriglevel)
 
 # Nachfolgende Zeile für Debugmeldungen ausschalten (level=0 bedeutet alle Meldungen)
 # DEBUG 10, INFO 20, WARNING 30
-logging.basicConfig(level=40)
+logging.basicConfig(level=30)
 logging.basicConfig(filename='logDatei.log', level=40)
 
-RevDate = "(18 Sep 2020)"
-SWRev = "0.3 "
+RevDate = "(22 Sep 2020)"
+SWRev = "0.4 "
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
-CHvpdiv = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
+VScaleVals = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
 # Vertical Sensitivity list in mA/div und Defaultwert "Channel I(Current) Per Division"
-CHipdiv = (0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0)
-# Time list in ms/div
-TMpdiv = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0)
+IScaleVals = (0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0)
+
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Tkinter UI Initialisierungen und Styles (Instanzierung root in config.py)
@@ -153,18 +162,7 @@ def onCanvasClickLeft(event):
         cf.TIMEdiv = 0.01
     # add markers only if stopped
     if cf.RUNstatus.get() == 0 and cf.ShowCur.get() > 0:
-        cf.MarkerNum = cf.MarkerNum + 1
-        # aktuelle Vertikalskalierungen und -offsets auslesen 
-         
-        cf.CHAVScale = float(eval(cf.CHAsb.get())) # Ohne try/excpet wie in aliceTimeFunc
-        cf.CHBVScale = float(eval(cf.CHBsb.get())) # da hier nicht nötig weil keine Neueingabe
-        cf.CHAIScale = float(eval(cf.CHAIsb.get()))
-        cf.CHBIScale = float(eval(cf.CHBIsb.get()))
-        cf.CHAVOffset = float(eval(cf.CHAVPosEntry.get()))           
-        cf.CHAIOffset = float(eval(cf.CHAIPosEntry.get()))
-        cf.CHBVOffset = float(eval(cf.CHBVPosEntry.get()))
-        cf.CHAIOffset = float(eval(cf.CHBIPosEntry.get()))
-     
+        cf.MarkerNum = cf.MarkerNum + 1  
         if cf.CHAVScale < 0.001: # prevent divide by zero error
             cf.CHAVScale = 0.001
         if cf.CHBVScale < 0.001:
@@ -270,6 +268,137 @@ def onSrateScroll(event): # Samplingrateeinstellung
 def onRetSrate(event): # <return> bei Samplingrateeinstellung
     logging.debug('onRetSrate()')
     m1k.SetSampleRate()
+    
+
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# Setterfunktionen für UI-Eingaben
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+#--- Vertikalskalierung
+def SetCHAVScale():
+    try:
+        cf.CHAVScale = float(eval(cf.CHAVsb.get()))
+    except:
+        cf.CHAVsb.delete(0,tk.END)
+        cf.CHAVsb.insert(0, cf.CHAVScale)
+    logging.debug('SetCHAVScale() with CHAVScale={}'.format(cf.CHAVScale))
+    UpdateTimeTrace()           # Always Update
+
+def SetCHAIScale():
+    logging.debug('SetCHAIScale()')
+    try:
+        cf.CHAIScale = float(eval(cf.CHAIsb.get()))
+    except:
+        cf.CHAIsb.delete(0,tk.END)
+        cf.CHAIsb.insert(0, cf.CHAIScale)
+    UpdateTimeTrace()           # Always Update
+
+def SetCHBVScale():
+    logging.debug('SetCHBVScale()')
+    try:
+        cf.CHBVScale = float(eval(cf.CHBVsb.get()))
+    except:
+        cf.CHBVsb.delete(0,tk.END)
+        cf.CHBVsb.insert(0, cf.CHBVScale)
+    UpdateTimeTrace()           # Always Update    
+
+def SetCHBIScale():
+    logging.debug('SetCHBIScale()')
+    try:
+        cf.CHBIScale = float(eval(cf.CHBIsb.get()))
+    except:
+        cf.CHBIsb.delete(0,tk.END)
+        cf.CHBIsb.insert(0, cf.CHBIScale)
+    UpdateTimeTrace()           # Always Update    
+#--- Vertikalposition
+def SetCHAVPos(event):
+    logging.debug('SetCHBVPos()')
+    try:
+        cf.CHAVPos = float(eval(cf.CHAVPosEntry.get()))
+    except:
+        cf.CHAVPosEntry.delete(0,tk.END)
+        cf.CHAVPosEntry.insert(0, cf.CHAVPos)
+    logging.debug('SetCHAVPos() with CHAVPos={}'.format(cf.CHAVPos))
+    UpdateTimeTrace()           # Always Update
+
+def SetCHAIPos(event):
+    logging.debug('SetCHBIPos()')
+    try:
+        cf.CHAIPos = float(eval(cf.CHAIPosEntry.get()))
+    except:
+        cf.CHAIPosEntry.delete(0,tk.END)
+        cf.CHAIPosEntry.insert(0, cf.CHAIPos)
+    UpdateTimeTrace()           # Always Update
+
+def SetCHBVPos(event):
+    logging.debug('SetCHBVOffset()')
+    try:
+        cf.CHBVPos = float(eval(cf.CHBVPosEntry.get()))
+    except:
+        cf.CHBVPosEntry.delete(0,tk.END)
+        cf.CHBVPosEntry.insert(0, cf.CHBVPos)
+    UpdateTimeTrace()           # Always Update
+
+def SetCHBIPos(event):
+    logging.debug('SetCHBIOffset()')
+    try:
+        cf.CHBIPos = float(eval(cf.CHBIPosEntry.get()))
+    except:
+        cf.CHBIPosEntry.delete(0,tk.END)
+        cf.CHBIPosEntry.insert(0, cf.CHBIPos)
+    UpdateTimeTrace()           # Always Update
+
+#--- Kalibrierwerte (rechts neben Oszibild)   
+def setCalValues(event):
+    logging.debug('setCalValues()')
+    try:
+        cf.CHAVOffset = float(eval(cf.CHAVOffsetEntry.get())) # UI-Input lesen und prüfen ob Float-Wert
+    except: # Falls kein Floatwert, UI-Input auf Standardwert setzen
+        cf.CHAVOffset = 0.0
+        cf.CHAVOffsetEntry.delete(0,tk.END)
+        cf.CHAVOffsetEntry.insert(0, cf.CHAVOffset)
+    try:
+        cf.CHAVGain = float(eval(cf.CHAVGainEntry.get()))
+    except:
+        cf.CHAVGain = 1.0
+        cf.CHAVGainEntry.delete(0,tk.END)
+        cf.CHAVGainEntry.insert(0, cf.CHAVGain)
+    try:
+        cf.CHBVOffset = float(eval(cf.CHBVOffsetEntry.get()))
+    except:
+        cf.CHBVOffset = 0.0
+        cf.CHBVOffsetEntry.delete(0,tk.END)
+        cf.CHBVOffsetEntry.insert(0, cf.CHBVOffset)
+    try:
+        cf.CHBVGain = float(eval(cf.CHBVGainEntry.get()))
+    except:
+        cf.CHBVGain = 1.0
+        cf.CHBVGainEntry.delete(0,tk.END)
+        cf.CHBVGainEntry.insert(0, cf.CHBVGain)
+    try:
+        cf.CHAIOffset = float(cf.CHAIOffsetEntry.get())
+    except:
+        cf.CHAIOffset = 0.0
+        cf.CHAIOffsetEntry.delete(0,tk.END)
+        cf.CHAIOffsetEntry.insert(0, cf.CHAIOffset)
+    try:
+        cf.CHBIOffset = float(cf.CHBIOffsetEntry.get())
+    except:
+        cf.CHBIOffset = 0.0
+        cf.CHBIOffsetEntry.delete(0,tk.END)
+        cf.CHBIOffsetEntry.insert(0, cf.CHBIOffset)
+    try:
+        cf.CHAIGain = float(cf.CHAIGainEntry.get())
+    except:
+        cf.CHAIGain = 1.0
+        cf.CHAIGainEntry.delete(0,tk.END)
+        cf.CHAIGainEntry.insert(0, cf.CHAIGain)
+    try:
+        cf.CHBIGain = float(cf.CHBIGainEntry.get())
+    except:
+        cf.CHBIGain = 1.0
+        cf.CHBIGainEntry.delete(0,tk.END)
+        cf.CHBIGainEntry.insert(0, cf.CHBIGain)
+    
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # M1K Spezifisches
@@ -378,7 +507,7 @@ def BSaveScreen():
 def BSaveData():
     filename = asksaveasfilename(defaultextension = ".csv", filetypes=[("Comma Separated Values", "*.csv")])
     DataFile = open(filename, 'w')
-    DataFile.write( 'Time (ms), CA-V (V), CA-I (mA), CB-V (V), CB-I (mA) \n' )
+    DataFile.write( 'Time (s), CA-V (V), CA-I (mA), CB-V (V), CB-I (mA) \n' )
     for index in range(len(cf.VBuffA)):
         TimePnt = float((index+0.0)/cf.SampRate)
         DataFile.write( str(TimePnt) + ', ' + str(cf.VBuffA[index]) + ', ' + str(cf.IBuffA[index]) + ', '
@@ -501,16 +630,19 @@ Cursormenu.menu.add_radiobutton(label='CA-I Cursor', background=cf.COLORtrace3, 
 Cursormenu.menu.add_radiobutton(label='CB-V Cursor', background=cf.COLORtrace2, value = 2, variable=cf.ShowCur, command=UpdateTimeTrace)
 Cursormenu.menu.add_radiobutton(label='CB-I Cursor', background=cf.COLORtrace4, value = 4, variable=cf.ShowCur, command=UpdateTimeTrace)
 Cursormenu.pack(side=tk.RIGHT, padx=(0,16))
-cursor_tip = CreateToolTip(Cursormenu, 'xy-Cursor einschalten und auswählen welcher dargestellter Signalverlauf damit vermessen wird')
+cursor_tip = CreateToolTip(Cursormenu, 'xy-Cursor einschalten und auswählen welcher dargestellter Signalverlauf damit vermessen wird'
+                           'Rechter Mausklick für Cursorkreuz, linker Mausklick (nur nach Stop) zum Setzen mehrerer xy-Punkte im Oszibild.')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Horizontal Menü: Time per Div
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-cf.TMsb = tk.Spinbox(frame1, width=5, values= TMpdiv, command=BTime)
+cf.TMsb = tk.Spinbox(frame1, width=5, values= cf.TMpdiv, command=BTime)
 cf.TMsb.bind('<MouseWheel>', onSpinBoxScroll)
+cf.TMsb.bind("<Return>", BTime)
 cf.TMsb.pack(side=tk.RIGHT, padx=(0,16))
 cf.TMsb.delete(0,tk.END)
 cf.TMsb.insert(0,0.5)
+cf.TMsb['state'] = ('readonly') # keine Texteingabe eigener Werte
 cf.TMlab = ttk.Label(frame1, text="Horz Scale ms/Div:")
 cf.TMlab.pack(side=tk.RIGHT)
 
@@ -561,7 +693,7 @@ Optionmenu["menu"]  = Optionmenu.menu
 Optionmenu.menu.add_command(label='Settings', command=MakeSettingsMenu)
 Optionmenu.menu.add_checkbutton(label='Smooth', variable=cf.SmoothCurves, command=UpdateTimeTrace)
 Optionmenu.menu.add_checkbutton(label='Z-O-Hold', variable=cf.ZOHold, command=UpdateTimeTrace)
-Optionmenu.menu.add_checkbutton(label='Trace Avg', variable=cf.TRACEmodeTime)
+Optionmenu.menu.add_checkbutton(label='Trace Avg', variable=cf.TraceAvgMode)
 Optionmenu.menu.add_radiobutton(label='Black BG', variable=cf.ColorMode, value=0, command=BgColor)
 Optionmenu.menu.add_radiobutton(label='White BG', variable=cf.ColorMode, value=1, command=BgColor)
 Optionmenu.pack(side=tk.LEFT, anchor=tk.W)
@@ -572,8 +704,6 @@ opt_tip=CreateToolTip(Optionmenu, 'Einstellungen, Abtastrate, Darstellungsformen
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Measurments und Math menu
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#measlab = ttk.Label(frame2r, text="Measure CA / CB ")
-#measlab.pack(side=tk.TOP, anchor=tk.E)
 dropmenu2 = ttk.Frame(frame2r)
 dropmenu2.pack(side=tk.TOP, pady=(0,8))
 #--- Drop Down Menü zur Auswahl der Mathematikfunktionen
@@ -629,7 +759,6 @@ MeasmenuB.menu.add_checkbutton(label='Max', variable=cf.MeasMaxI2)
 MeasmenuB.menu.add_checkbutton(label='P-P', variable=cf.MeasPPI2)
 MeasmenuB.menu.add_checkbutton(label='RMS', variable=cf.MeasRMSI2)
 MeasmenuB.pack(side=tk.LEFT)
-
 measlab = ttk.Label(dropmenu2, text="Meas\n CA/CB")
 measlab.pack(side=tk.LEFT)
 
@@ -654,7 +783,7 @@ ckbt3.grid(row=1, column=0)
 ckbt4 = ttk.Checkbutton(curvecheckb, text='CB-I', style="Strace4.TCheckbutton", variable=cf.ShowC2_I, command=m1k.TraceSelectADC_Mux)
 ckbt4.grid(row=1, column=1)
 # Tooltips
-actCh_tip = CreateToolTip(curvelab, 'Auswahl der dargestellten Signalverläufe. Für 200 kS/s maximal 2 Kanäle auswählen.')
+CreateToolTip(curvelab, 'Auswahl der dargestellten Signalverläufe. Für 200 kS/s maximal 2 Kanäle auswählen.')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Menü zur Auswahl der Samplingrate
@@ -669,6 +798,7 @@ cf.SampRatesb.bind("<Return>", onRetSrate)
 cf.SampRatesb.pack(side=tk.LEFT)
 cf.SampRatesb.delete(0,tk.END)
 cf.SampRatesb.insert(0,cf.SampRate) # mit 100 kS/s initialisieren
+cf.SampRatesb['state'] = ('readonly') # keine Texteingabe eigener Werte
 Samplab = ttk.Label(SampMenu, text="Sample Rate \n (S/s)")
 Samplab.pack(side=tk.LEFT)
 
@@ -676,7 +806,7 @@ Samplab.pack(side=tk.LEFT)
 SampRate_tip = CreateToolTip(cf.SampRatesb, 'Abtastrate für ADC (Oszi) und DAC-Abtastrate (AWG). 200 kS/s nur bei ADC falls 2 oder weniger Kanäle aktiv.')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Gain-/Offsetkorrektur für V und I der beiden Kanäle (Fenster rechts)
+# Gain-/Offsetkorrektur (Kalibrierung) für V und I der beiden Kanäle (Fenster rechts)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 prlab = ttk.Label(frame2r, text="Calibrate Gain / Offset")
 prlab.pack(side=tk.TOP, pady=(8,0))
@@ -686,13 +816,13 @@ gain1lab = ttk.Label(ProbeA, text="CA-V")
 gain1lab.pack(side=tk.LEFT)
 
 cf.CHAVGainEntry = tk.Entry(ProbeA, width=6)
-cf.CHAVGainEntry.bind('<Return>', onTextKey)
+cf.CHAVGainEntry.bind('<Return>', setCalValues)
 cf.CHAVGainEntry.pack(side=tk.LEFT)
 cf.CHAVGainEntry.delete(0,tk.END)
 cf.CHAVGainEntry.insert(0,1.0)
 
 cf.CHAVOffsetEntry = tk.Entry(ProbeA, width=6)
-cf.CHAVOffsetEntry.bind('<Return>', onTextKey)
+cf.CHAVOffsetEntry.bind('<Return>', setCalValues)
 cf.CHAVOffsetEntry.pack(side=tk.LEFT)
 cf.CHAVOffsetEntry.delete(0,tk.END)
 cf.CHAVOffsetEntry.insert(0,0.0)
@@ -703,13 +833,13 @@ gain2lab = ttk.Label(ProbeB, text="CB-V")
 gain2lab.pack(side=tk.LEFT)
 
 cf.CHBVGainEntry = tk.Entry(ProbeB, width=6)
-cf.CHBVGainEntry.bind('<Return>', onTextKey)
+cf.CHBVGainEntry.bind('<Return>', setCalValues)
 cf.CHBVGainEntry.pack(side=tk.LEFT)
 cf.CHBVGainEntry.delete(0,tk.END)
 cf.CHBVGainEntry.insert(0,1.0)
 
 cf.CHBVOffsetEntry = tk.Entry(ProbeB, width=6)
-cf.CHBVOffsetEntry.bind('<Return>', onTextKey)
+cf.CHBVOffsetEntry.bind('<Return>', setCalValues)
 cf.CHBVOffsetEntry.pack(side=tk.LEFT)
 cf.CHBVOffsetEntry.delete(0,tk.END)
 cf.CHBVOffsetEntry.insert(0,0.0)
@@ -720,13 +850,13 @@ gainailab = ttk.Label(ProbeAI, text="CA-I")
 gainailab.pack(side=tk.LEFT)
 
 cf.CHAIGainEntry = tk.Entry(ProbeAI, width=6)
-cf.CHAIGainEntry.bind('<Return>', onTextKey)
+cf.CHAIGainEntry.bind('<Return>', setCalValues)
 cf.CHAIGainEntry.pack(side=tk.LEFT)
 cf.CHAIGainEntry.delete(0,tk.END)
 cf.CHAIGainEntry.insert(0,1.0)
 
 cf.CHAIOffsetEntry = tk.Entry(ProbeAI, width=6)
-cf.CHAIOffsetEntry.bind('<Return>', onTextKey)
+cf.CHAIOffsetEntry.bind('<Return>', setCalValues)
 cf.CHAIOffsetEntry.pack(side=tk.LEFT)
 cf.CHAIOffsetEntry.delete(0,tk.END)
 cf.CHAIOffsetEntry.insert(0,0.0)
@@ -737,13 +867,13 @@ gainbilab = ttk.Label(ProbeBI, text="CB-I")
 gainbilab.pack(side=tk.LEFT)
 
 cf.CHBIGainEntry = tk.Entry(ProbeBI, width=6)
-cf.CHBIGainEntry.bind('<Return>', onTextKey)
+cf.CHBIGainEntry.bind('<Return>', setCalValues)
 cf.CHBIGainEntry.pack(side=tk.LEFT)
 cf.CHBIGainEntry.delete(0,tk.END)
 cf.CHBIGainEntry.insert(0,1.0)
 
 cf.CHBIOffsetEntry = tk.Entry(ProbeBI, width=6)
-cf.CHBIOffsetEntry.bind('<Return>', onTextKey)
+cf.CHBIOffsetEntry.bind('<Return>', setCalValues)
 cf.CHBIOffsetEntry.pack(side=tk.LEFT)
 cf.CHBIOffsetEntry.delete(0,tk.END)
 cf.CHBIOffsetEntry.insert(0,0.0)
@@ -766,82 +896,88 @@ cf.AWGBMenus.pack(side=tk.TOP)
 cf.AWGBSet= ttk.Frame(frame2r)
 cf.AWGBSet.pack(side=tk.TOP)
 
-MakeAWGMenuInside()
+MakeAWGMenu()
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Vertikaleinstellungen Gain und Offset für V und I der beiden Kanäle
 # Boxen unterhalb Oszibild
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Voltage channel A: Verschiedene V/Div - Werte siehe CHvpdiv
+# Voltage channel A: Verschiedene V/Div - Werte siehe VScaleVals
 CHAlab = ttk.Label(frame3, text="CA V/Div:", background=cf.COLORtrace1)
 CHAlab.pack(side=tk.LEFT)
-cf.CHAsb = tk.Spinbox(frame3, width=5, values=CHvpdiv, command=BCHAlevel)
-cf.CHAsb.bind('<MouseWheel>', onSpinBoxScroll)
-cf.CHAsb.pack(side=tk.LEFT)
-cf.CHAsb.delete(0,tk.END)
-cf.CHAsb.insert(0,0.5)
+cf.CHAVsb = tk.Spinbox(frame3, width=5, values=VScaleVals, command=SetCHAVScale)
+cf.CHAVsb.bind('<MouseWheel>', onSpinBoxScroll)
+cf.CHAVsb.pack(side=tk.LEFT)
+cf.CHAVsb.delete(0,tk.END)
+cf.CHAVsb.insert(0,0.5) # 0,5 als Anfangswert setzen
+cf.CHAVsb['state'] = ('readonly') # keine Texteingabe eigener Werte
 CHAofflab = ttk.Label(frame3, text="CA-V Pos:", background=cf.COLORtrace1)
 CHAofflab.pack(side=tk.LEFT) # rechts neben Widget 6 Pixel Abstand
 cf.CHAVPosEntry = tk.Entry(frame3, width=5)
-cf.CHAVPosEntry.bind("<Return>", BOffsetA)
+cf.CHAVPosEntry.bind("<Return>", SetCHAVPos)
 cf.CHAVPosEntry.pack(side=tk.LEFT, padx=(0,8))
 cf.CHAVPosEntry.delete(0,tk.END)
 cf.CHAVPosEntry.insert(0,2.5)
 
-# Current channel A: Verschiedene A/Div - Werte siehe CHipdiv
-cf.CHAIsb = tk.Spinbox(frame3, width=5, values=CHipdiv, command=BCHAIlevel)
+# Current channel A: Verschiedene A/Div - Werte siehe IScaleVals
+CHAIlab = ttk.Label(frame3, text="CA mA/Div:", background=cf.COLORtrace3)
+CHAIlab.pack(side=tk.LEFT)
+cf.CHAIsb = tk.Spinbox(frame3, width=5, values=IScaleVals, command=SetCHAIScale)
 cf.CHAIsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHAIsb.pack(side=tk.LEFT)
 cf.CHAIsb.delete(0,tk.END)
 cf.CHAIsb.insert(0,50.0)
-CHAIlab = ttk.Label(frame3, text="CA mA/Div", background=cf.COLORtrace3)
-CHAIlab.pack(side=tk.LEFT)
+cf.CHAIsb['state'] = ('readonly') # keine Texteingabe eigener Werte
+CHAIofflab = ttk.Label(frame3, text="CA-I Pos:", background=cf.COLORtrace3)
+CHAIofflab.pack(side=tk.LEFT)
 cf.CHAIPosEntry = tk.Entry(frame3, width=5)
-cf.CHAIPosEntry.bind("<Return>", BIOffsetA)
-cf.CHAIPosEntry.pack(side=tk.LEFT)
+cf.CHAIPosEntry.bind("<Return>", SetCHAIPos)
+cf.CHAIPosEntry.pack(side=tk.LEFT, padx=(0,8))
 cf.CHAIPosEntry.delete(0,tk.END)
 cf.CHAIPosEntry.insert(0,0.0)
-CHAIofflab = ttk.Label(frame3, text="CA-I Pos", background=cf.COLORtrace3)
-CHAIofflab.pack(side=tk.LEFT, padx=(0,8))
 
 # Voltage channel B:
-cf.CHBsb = tk.Spinbox(frame3, width=5, values=CHvpdiv, command=BCHBlevel)
-cf.CHBsb.bind('<MouseWheel>', onSpinBoxScroll)
-cf.CHBsb.pack(side=tk.LEFT)
-cf.CHBsb.delete(0,tk.END)
-cf.CHBsb.insert(0,0.5)
-CHBlab = ttk.Label(frame3, text="CB V/Div", background=cf.COLORtrace2)
+CHBlab = ttk.Label(frame3, text="CB V/Div:", background=cf.COLORtrace2)
 CHBlab.pack(side=tk.LEFT)
+cf.CHBVsb = tk.Spinbox(frame3, width=5, values=VScaleVals, command=SetCHBVScale)
+cf.CHBVsb.bind('<MouseWheel>', onSpinBoxScroll)
+cf.CHBVsb.pack(side=tk.LEFT)
+cf.CHBVsb.delete(0,tk.END)
+cf.CHBVsb.insert(0,0.5)
+cf.CHBVsb['state'] = ('readonly') # keine Texteingabe eigener Werte
+CHBofflab = ttk.Label(frame3, text="CB-V Pos:", background=cf.COLORtrace2)
+CHBofflab.pack(side=tk.LEFT)
 cf.CHBVPosEntry = tk.Entry(frame3, width=5)
-cf.CHBVPosEntry.bind("<Return>", BOffsetB)
-cf.CHBVPosEntry.pack(side=tk.LEFT)
+cf.CHBVPosEntry.bind("<Return>", SetCHBVPos)
+cf.CHBVPosEntry.pack(side=tk.LEFT, padx=(0,8))
 cf.CHBVPosEntry.delete(0,tk.END)
 cf.CHBVPosEntry.insert(0,2.5)
-CHBofflab = ttk.Label(frame3, text="CB-V Pos", background=cf.COLORtrace2)
-CHBofflab.pack(side=tk.LEFT, padx=(0,8))
+
 
 # Current channel B:
-cf.CHBIsb = tk.Spinbox(frame3, width=5, values=CHipdiv, command=BCHBIlevel)
+CHBIlab = ttk.Label(frame3, text="CB mA/Div:", background=cf.COLORtrace4)
+CHBIlab.pack(side=tk.LEFT)
+cf.CHBIsb = tk.Spinbox(frame3, width=5, values=IScaleVals, command=SetCHBIScale)
 cf.CHBIsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHBIsb.pack(side=tk.LEFT)
 cf.CHBIsb.delete(0,tk.END)
 cf.CHBIsb.insert(0,50.0)
-CHBIlab = ttk.Label(frame3, text="CB mA/Div", background=cf.COLORtrace4)
-CHBIlab.pack(side=tk.LEFT)
+cf.CHBIsb['state'] = ('readonly') # keine Texteingabe eigener Werte
+CHBIofflab = ttk.Label(frame3, text="CB-I Pos:", background=cf.COLORtrace4)
+CHBIofflab.pack(side=tk.LEFT)
 cf.CHBIPosEntry = tk.Entry(frame3, width=5)
-cf.CHBIPosEntry.bind("<Return>", BIOffsetB)
+cf.CHBIPosEntry.bind("<Return>", SetCHBIPos)
 cf.CHBIPosEntry.pack(side=tk.LEFT)
 cf.CHBIPosEntry.delete(0,tk.END)
 cf.CHBIPosEntry.insert(0,0.0)
-CHBIofflab = ttk.Label(frame3, text="CB-I Pos", background=cf.COLORtrace4)
-CHBIofflab.pack(side=tk.LEFT)
+
 
 mathInfolab = ttk.Label(frame3, text="Math traces refer to CA scales")
 mathInfolab.pack(side=tk.LEFT, padx=(8,0))
 
 # Tooltips für die Vertikaleinstellungen zu Channel A und B
-CHAlab_tip = CreateToolTip(cf.CHAsb, 'Vertikalskalierung Kanal A Spannung (CA-V) (und Math) in V/Div')
-CHBlab_tip = CreateToolTip(cf.CHBsb, 'Vertikalskalierung Kanal B Spannung (CB-V) in V/Div')
+CHAlab_tip = CreateToolTip(cf.CHAVsb, 'Vertikalskalierung Kanal A Spannung (CA-V) (und Math) in V/Div')
+CHBlab_tip = CreateToolTip(cf.CHBVsb, 'Vertikalskalierung Kanal B Spannung (CB-V) in V/Div')
 CHAIlab_tip = CreateToolTip(cf.CHAIsb, 'Vertikalskalierung Kanal A Strom (CA-I) (und Math) in mA/Div')
 CHBIlab_tip = CreateToolTip(cf.CHBIsb, 'Vertikalskalierung in mA/Div Kanal B Strom (CA-I)')
 CHAofflab_tip = CreateToolTip(cf.CHAVPosEntry, 'Höhe der Nulllinie Kanal A Spannung (CA-V) (und Math) in V ')
@@ -860,4 +996,4 @@ CHBIofflab_tip = CreateToolTip(cf.CHBIPosEntry, 'Höhe der Nulllinie Kanal B Str
 ConSingDev() # Connect a single (only one connected) M1K device
 logging.debug('Vor root.update() in der Hauptroutine')
 cf.root.update() # Activate updated screens  
-m1k.Analog_In() # Start sampling
+m1k.ScopeGo() # Start sampling

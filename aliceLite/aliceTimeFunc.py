@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 15.9.20
+S. Mack, 22.9.20
 """
 import tkinter as tk
 import config as cf
@@ -20,9 +20,9 @@ MathAxis = "V-A"
 MouseCAV = MouseCAI = MouseCBV = MouseCBI = -10
 DISsamples = cf.GRW # Number of samples to display
 
-## Make the scope time traces
+## Bei Signalverläufen die Arraywerte in Pixelpositionen umrechnen und damit Grafikkurve berechnen
 def MakeTimeTrace():
-    logging.warning('MakeTimeTrace()')
+    logging.debug('MakeTimeTrace()')
     global T1Vline, T2Vline, T1Iline, T2Iline
     global TMAVline, TMBVline, TMCVline, TMDVline
     global Tmathline, TMXline, TMYline
@@ -30,59 +30,19 @@ def MakeTimeTrace():
     global Triggerline, Triggersymbol
     global MouseCAV, MouseCAI, MouseCBV, MouseCBI    
     global SCstart, DISsamples
-    global CurOffA, CurOffB, CurGainA, CurGainB
 
     if len(cf.VBuffA) < 100:
         return
-
-    SCstart = 0 # Index für Zeitpunkt 0
+    NHozPos = int(cf.HozPos * cf.SampRate/1000) # Horizontaloffset in Abtastintervallen
+    # Index Zeit 0 Darstellung relativ zu Triggerzeitpunkt: Horizontaloffset + halbe 
+    # Gridbreite damit Triggerzeitpunkt in der Mitte
+    SCstart = NHozPos - int(cf.SampRate * 5.0 * cf.TIMEdiv / 1000.0) 
     ylo = 0.0
     Ymin = cf.Y0T # Minimum position of time grid (top)
     Ymax = cf.Y0T + cf.GRH # Maximum position of time grid (bottom)
     # prevent divide by zero error
     if cf.TIMEdiv < 0.0002:
         cf.TIMEdiv = 0.01
-    try:
-        cf.CHAVScale = float(eval(cf.CHAsb.get()))
-    except:
-        cf.CHAsb.delete(0,tk.END)
-        cf.CHAsb.insert(0, cf.CHAVScale)
-    try:
-        cf.CHBVScale = float(eval(cf.CHBsb.get()))
-    except:
-        cf.CHBsb.delete(0,tk.END)
-        cf.CHBsb.insert(0, cf.CHBVScale)
-    try:
-        cf.CHAIScale = float(eval(cf.CHAIsb.get()))
-    except:
-        cf.CHAIsb.delete(0,tk.END)
-        cf.CHAIsb.insert(0, cf.CHAIScale)
-    try:
-        cf.CHBIScale = float(eval(cf.CHBIsb.get()))
-    except:
-        cf.CHBIsb.delete(0,tk.END)
-        cf.CHBIsb.insert(0, cf.CHBIScale)
-    # get the vertical offsets
-    try:
-        cf.CHAVOffset = float(eval(cf.CHAVPosEntry.get()))
-    except:
-        cf.CHAVPosEntry.delete(0,tk.END)
-        cf.CHAVPosEntry.insert(0, cf.CHAVOffset)
-    try:
-        cf.CHAIOffset = float(eval(cf.CHAIPosEntry.get()))
-    except:
-        cf.CHAIPosEntry.delete(0,tk.END)
-        cf.CHAIPosEntry.insert(0, cf.CHAIOffset)
-    try:
-        cf.CHBVOffset = float(eval(cf.CHBVPosEntry.get()))
-    except:
-        cf.CHBVPosEntry.delete(0,tk.END)
-        cf.CHBVPosEntry.insert(0, cf.CHBVOffset)
-    try:
-        cf.CHBIOffset = float(eval(cf.CHBIPosEntry.get()))
-    except:
-        cf.CHBIPosEntry.delete(0,tk.END)
-        cf.CHBIPosEntry.insert(0, cf.CHBIOffset)
     # prevent divide by zero error
     if cf.CHAVScale < 0.001:
         cf.CHAVScale = 0.001
@@ -94,32 +54,34 @@ def MakeTimeTrace():
         cf.CHBIScale = 0.1
           
     #  drawing the traces 
-    if cf.NTrace == 0: # If no trace, skip rest of this routine
+    if cf.NSamples == 0: # If no trace, skip rest of this routine
         T1Vline = []   # Trace line channel A V
         T2Vline = []   # Trace line channel B V
         T1Iline = []
         T2Iline = []
         Tmathline = [] # math trce line
         return() 
-    # set and/or corrected for in range
+    # Darstellungsoffset bezogen auf Triggerzeit auf +/-1 1/4 Sampletracelänge
+    # beschränken (Triggerzeitpunkt ist innerhalb 0.25..0.75)
     if cf.TgInput.get() > 0: # Trigger auf Signal aktiv (nicht None)
-        SCmin = int(-1 * cf.TRIGGERsample) # erster Index für Darstellung # Wieso negativ?
-        SCmax = int(cf.NTrace - cf.TRIGGERsample - 0) # letzter Index für Darstellung
+        SCmin = - int(cf.NSamples * 0.25)
+        SCmax = int(cf.NSamples * 0.25)
+        #SCmin = int(-1 * cf.TRIGGERsample) # erster Index für Darstellung # Wieso negativ?
+        #SCmax = int(cf.NSamples - cf.TRIGGERsample - 0) # letzter Index für Darstellung
     else:
         SCmin = 0 
-        SCmax = cf.NTrace - 1
+        SCmax = cf.NSamples - 1
     if SCstart < SCmin:             # Index für Zeitpunkt 0 kann nicht kleiner sein als Anfang Sample-Trace
         SCstart = SCmin
     if SCstart  > SCmax:            # Index für Zeitpunkt 0 kann nicht größer sein als Ende Sample-Trace
         SCstart = SCmax
     # Make Trace lines etc.
-    Yconv1 = float(cf.GRH/10.0) / cf.CHAVScale    # Vertical Conversion factors from samples to screen points
-    Yconv2 = float(cf.GRH/10.0) / cf.CHBVScale
-    YIconv1 = float(cf.GRH/10.0) / cf.CHAIScale
-    YIconv2 = float(cf.GRH/10.0) / cf.CHBIScale
+    YAVconv = float(cf.GRH/10.0) / cf.CHAVScale    # Vertical Conversion factors from samples to screen points
+    YBVconv = float(cf.GRH/10.0) / cf.CHBVScale
+    YAIconv = float(cf.GRH/10.0) / cf.CHAIScale
+    YBIconv = float(cf.GRH/10.0) / cf.CHBIScale
      
-    c1 = cf.GRH / 2.0 + cf.Y0T    # fixed correction channel A
-    c2 = cf.GRH / 2.0 + cf.Y0T    # fixed correction channel B
+    yMidGrid = cf.GRH / 2.0 + cf.Y0T    # Pixelzeile des Canvas für die Gridmitte
  
     DISsamples = cf.SampRate * 10.0 * cf.TIMEdiv / 1000.0 # number of samples to display
     # Wie kriegt man es hin, dass die Traces nur aktualisiert werden bei Trigger>None oder Triggerereignis?
@@ -132,20 +94,20 @@ def MakeTimeTrace():
     if len(cf.VBuffA) < 4 and len(cf.VBuffB) < 4 and len(cf.IBuffA) < 4 and len(cf.IBuffB) < 4:
         return
     t = int(SCstart + cf.TRIGGERsample) # Start Index im Sample Trace für Darstellung # Hier = Triggerzeitpunkt
-    logging.warning('MakeTimeTrace(): Start Index t={}, SCstart={}, cf.TRIGGERsample={}'.format(t,SCstart,cf.TRIGGERsample))
+    logging.debug('MakeTimeTrace(): Start Index t={}, SCstart={}, cf.TRIGGERsample={}'.format(t,SCstart,cf.TRIGGERsample))
     if t < 0:
         t = 0
     x = 0                           # Horizontal screen pixel
 
-    ypv1 = int(c1 - Yconv1 * (cf.VBuffA[t] - cf.CHAVOffset))
-    ypi1 = int(c1 - YIconv1 * (cf.IBuffA[t] - cf.CHAIOffset))
-    ypv2 = int(c2 - Yconv2 * (cf.VBuffB[t] - cf.CHBVOffset))
-    ypi2 = int(c1 - YIconv2 * (cf.IBuffB[t] - cf.CHBIOffset))
+    ypv1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] - cf.CHAVPos))
+    ypi1 = int(yMidGrid - YAIconv * (cf.IBuffA[t] - cf.CHAIPos))
+    ypv2 = int(yMidGrid - YBVconv * (cf.VBuffB[t] - cf.CHBVPos))
+    ypi2 = int(yMidGrid - YBIconv * (cf.IBuffB[t] - cf.CHBIPos))
     DvY1 = DvY2 = DiY1 = DiY2 = 0 
 
     if (DISsamples <= cf.GRW): # Weniger Abtastpunkte als die Breite des Grids (in Pixel)
-        logging.warning('MakeTimeTrace(): Weniger Abtastpunkte als Breite Grid')
         Xstep = cf.GRW / DISsamples
+        logging.debug('MakeTimeTrace(): Weniger Abtastpunkte als Breite Grid, Xstep={}, cf.trgIpol={}'.format(Xstep,cf.trgIpol))
         if cf.AWGBMode.get() == 2 and cf.Two_X_Sample == 0:
             xa = int((Xstep/-2.5) - (Xstep*cf.trgIpol))
         else:
@@ -154,24 +116,25 @@ def MakeTimeTrace():
         x1 = 0 # x position of trace line
         xa1 = 0
         y1 = 0.0 # y position of trace line
-        ypv1 = int(c1 - Yconv1 * (cf.VBuffA[t] - cf.CHAVOffset))
+        logging.debug('MakeTimeTrace(): Weniger Abtastpunkte als Breite Grid, xa={}, x={}'.format(xa,x))
+        ypv1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] - cf.CHAVPos))
         ytemp = cf.IBuffA[t]
-        ypi1 = int(c1 - YIconv1 * (ytemp - cf.CHAIOffset))
-        ypv2 = int(c2 - Yconv2 * (cf.VBuffB[t] - cf.CHBVOffset))
+        ypi1 = int(yMidGrid - YAIconv * (ytemp - cf.CHAIPos))
+        ypv2 = int(yMidGrid - YBVconv * (cf.VBuffB[t] - cf.CHBVPos))
         ytemp = cf.IBuffB[t]
-        ypi2 = int(c1 - YIconv2 * (ytemp - cf.CHBIOffset))
-        ypm = cf.GRH / 2.0 + cf.Y0T
+        ypi2 = int(yMidGrid - YBIconv * (ytemp - cf.CHBIPos))
+        ypm = cf.GRH / 2.0 + cf.Y0T  # vorheriger Math-Wert (previous)
         if cf.TgInput.get() == 0:
             Xlimit = cf.GRW
         else:
             Xlimit = cf.GRW+Xstep
         while x <= Xlimit:
-            if t < cf.NTrace:
+            if t < cf.NSamples:
                 xa1 = xa + cf.X0L
                 x1 = x + cf.X0L
-                y1 = int(c1 - Yconv1 * (cf.VBuffA[t] - cf.CHAVOffset))
+                y1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] - cf.CHAVPos))
                 ytemp = cf.IBuffA[t]
-                yi1 = int(c1 - YIconv1 * (ytemp - cf.CHAIOffset))
+                yi1 = int(yMidGrid - YAIconv * (ytemp - cf.CHAIPos))
                 
                 if y1 < Ymin: # clip waveform if going off grid
                     y1 = Ymin
@@ -184,7 +147,7 @@ def MakeTimeTrace():
                 if cf.ShowC1_V.get() == 1 :
                     if cf.ZOHold.get() == 1:
                         T1Vline.append(int(xa1))
-                        T1Vline.append(int(ypv1))
+                        T1Vline.append(int(ypv1)) # vorheriger y-Wert (previous)
                         T1Vline.append(int(xa1))
                         T1Vline.append(int(y1))
                     else:    
@@ -195,7 +158,7 @@ def MakeTimeTrace():
                 if cf.ShowC1_I.get() == 1:
                     if cf.ZOHold.get() == 1:
                         T1Iline.append(int(xa1))
-                        T1Iline.append(int(ypi1))
+                        T1Iline.append(int(ypi1)) # vorheriger y-Wert (previous)
                         T1Iline.append(int(xa1))
                         T1Iline.append(int(yi1))
                     else:
@@ -204,14 +167,14 @@ def MakeTimeTrace():
                     DiY1 = ypi1 - yi1
                     ypi1 = yi1
                 if cf.ShowC2_V.get() == 1:
-                    y1 = int(c2 - Yconv2 * (cf.VBuffB[t] - cf.CHBVOffset))
+                    y1 = int(yMidGrid - YBVconv * (cf.VBuffB[t] - cf.CHBVPos))
                     if y1 < Ymin: # clip waveform if going off grid
                         y1 = Ymin
                     if y1 > Ymax:
                         y1 = Ymax
                     if cf.ZOHold.get() == 1:
                         T2Vline.append(int(x1))
-                        T2Vline.append(int(ypv2))
+                        T2Vline.append(int(ypv2))  # vorheriger y-Wert (previous)
                         T2Vline.append(int(x1))
                         T2Vline.append(int(y1))
                     else:
@@ -221,14 +184,14 @@ def MakeTimeTrace():
                     ypv2 = y1
                 if cf.ShowC2_I.get() == 1:
                     ytemp = cf.IBuffB[t]
-                    yi1 = int(c1 - YIconv2 * (ytemp - cf.CHBIOffset))
+                    yi1 = int(yMidGrid - YBIconv * (ytemp - cf.CHBIPos))
                     if yi1 < Ymin:
                         yi1 = Ymin
                     if yi1 > Ymax:
                         yi1 = Ymax
                     if (cf.ZOHold.get() == 1):
                         T2Iline.append(int(x1))
-                        T2Iline.append(int(ypi2))
+                        T2Iline.append(int(ypi2))  # vorheriger y-Wert (previous)
                         T2Iline.append(int(x1))
                         T2Iline.append(int(yi1))
                     else:
@@ -238,47 +201,47 @@ def MakeTimeTrace():
                     ypi2 = yi1
                 if cf.MathTrace.get() > 0:
                     if cf.MathTrace.get() == 1: # plot sum of CA-V and CB-V
-                        y1 = int(c1 - Yconv1 * (cf.VBuffA[t] + cf.VBuffB[t] - cf.CHAVOffset))
+                        y1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] + cf.VBuffB[t] - cf.CHAVPos))
                     elif cf.MathTrace.get() == 2: # plot difference of CA-V and CB-V 
-                        y1 = int(c1 - Yconv1 * (cf.VBuffA[t] - cf.VBuffB[t] - cf.CHAVOffset))
+                        y1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] - cf.VBuffB[t] - cf.CHAVPos))
                     elif cf.MathTrace.get() == 3: # plot difference of CB-V and CA-V 
-                        y1 = int(c2 - Yconv2 * (cf.VBuffB[t] - cf.VBuffA[t] - cf.CHBVOffset))
+                        y1 = int(yMidGrid - YBVconv * (cf.VBuffB[t] - cf.VBuffA[t] - cf.CHBVPos))
                     elif cf.MathTrace.get() == 4: # plot product of CA-V and CA-I
                         Ypower = cf.VBuffA[t] * cf.IBuffA[t] # mAmps * Volts = mWatts
-                        ytemp = YIconv1 * (Ypower - cf.CHAIOffset)
-                        y1 = int(c1 - ytemp)
+                        ytemp = YAIconv * (Ypower - cf.CHAIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 5: # plot product of CB-V and CB-I
                         Ypower = cf.VBuffB[t] * cf.IBuffB[t] # mAmps * Volts = mWatts
-                        ytemp = YIconv2 * (Ypower - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YBIconv * (Ypower - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 6: # plot ratio of CA-V and CA-I
                         Yohms = cf.VBuffA[t] / (cf.IBuffA[t] / 1000.0) #  Volts / Amps = ohms
-                        ytemp = YIconv1 * (Yohms - cf.CHAIOffset)
-                        y1 = int(c1 - ytemp)
+                        ytemp = YAIconv * (Yohms - cf.CHAIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 7: # plot ratio of CB-V and CB-I
                         Yohms = cf.cf.VBuffB[t] / (cf.IBuffB[t] / 1000.0) #  Volts / Amps = ohms
-                        ytemp = YIconv2 * (Yohms - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YBIconv * (Yohms - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 8: # plot difference of CA-I and CB-I
                         Ydif = (cf.IBuffA[t] - cf.IBuffB[t])#  in mA
-                        ytemp = YIconv1 * (Ydif - cf.CHAIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YAIconv * (Ydif - cf.CHAIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 9: # plot difference of CB-I and CA-I
                         Ydif =  (cf.IBuffB[t] - cf.IBuffA[t]) #  in mA
-                        ytemp = YIconv2 * (Ydif - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YBIconv * (Ydif - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 10: # plot ratio of CB-V and CA-V
                         try:
-                            y1 = int(c1 - Yconv2 * ((cf.VBuffB[t] / cf.VBuffA[t]) - cf.CHBVOffset)) #  voltage gain A to B
+                            y1 = int(yMidGrid - YBVconv * ((cf.VBuffB[t] / cf.VBuffA[t]) - cf.CHBVPos)) #  voltage gain A to B
                         except:
-                            y1 = int(c1 - Yconv2 * ((cf.VBuffB[t] / 0.000001) - cf.CHBVOffset))
+                            y1 = int(yMidGrid - YBVconv * ((cf.VBuffB[t] / 0.000001) - cf.CHBVPos))
                     elif cf.MathTrace.get() == 11: # plot ratio of CB-I and CA-I
                         try:
                             Y1 = (cf.IBuffB[t] / cf.IBuffA[t])  # current gain A to B
                         except:
                             Y1 = (cf.IBuffB[t] / 0.000001)
-                        ytemp = YIconv2 * (Y1 - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)                                         
+                        ytemp = YBIconv * (Y1 - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)                                         
                     if y1 < Ymin: # clip waveform if going off grid
                         y1 = Ymin
                     if y1 > Ymax:
@@ -302,9 +265,10 @@ def MakeTimeTrace():
                 MouseCBI = ypi2 - (DiY2 * (Xfine/Xstep))
             t = int(t + 1)
             x = x + Xstep
-            xa = xa + Xstep           
+            xa = xa + Xstep 
     else: # Mehr Abtastpunkte als die Breite des Grids (in Pixel)
-        logging.warning('MakeTimeTrace():Mehr Abtastpunkte als Breite Grid')
+        # ZO-Modus macht hier keinen Sinn, da ja nicht darstellbar
+        logging.debug('MakeTimeTrace():Mehr Abtastpunkte als Breite Grid')
         Xstep = 1
         Tstep = DISsamples / cf.GRW      # number of samples to skip per grid pixel
         x1 = 0.0                          # x position of trace line
@@ -318,33 +282,33 @@ def MakeTimeTrace():
         x = 0               # Horizontal screen pixel
         ft = t              # time point with fractions
         while (x <= cf.GRW):
-            if (t < cf.NTrace):
+            if (t < cf.NSamples):
                 if (t >= len(cf.VBuffA)):
                     t = len(cf.VBuffA)-2
                     x = cf.GRW
                 x1 = x + cf.X0L
-                ylo = cf.VBuffA[t] - cf.CHAVOffset
-                ilo = cf.IBuffA[t] - cf.CHAIOffset
+                ylo = cf.VBuffA[t] - cf.CHAVPos
+                ilo = cf.IBuffA[t] - cf.CHAIPos
                 yhi = ylo
                 ihi = ilo
                 n = t
-                while n < (t + Tstep) and n < cf.NTrace:
+                while n < (t + Tstep) and n < cf.NSamples:
                     if ( cf.ShowC1_V.get() == 1 ):
-                        v = cf.VBuffA[t] - cf.CHAVOffset
+                        v = cf.VBuffA[t] - cf.CHAVPos
                         if v < ylo:
                             ylo = v
                         if v > yhi:
                             yhi = v
                     if ( cf.ShowC1_I.get() == 1 ):
-                        i = cf.IBuffA[t] - cf.CHAIOffset
+                        i = cf.IBuffA[t] - cf.CHAIPos
                         if i < ilo:
                             ilo = i
                         if i > ihi:
                             ihi = i
                     n = n + 1
                 if ( cf.ShowC1_V.get() == 1 ):
-                    ylo = int(c1 - Yconv1 * ylo)
-                    yhi = int(c1 - Yconv1 * yhi)
+                    ylo = int(yMidGrid - YAVconv * ylo)
+                    yhi = int(yMidGrid - YAVconv * yhi)
                     if (ylo < Ymin):
                         ylo = Ymin
                     if (ylo > Ymax):
@@ -359,8 +323,8 @@ def MakeTimeTrace():
                     T1Vline.append(int(yhi))
                     ypv1 = ylo
                 if ( cf.ShowC1_I.get() == 1 ):    
-                    ilo = int(c1 - YIconv1 * ilo)
-                    ihi = int(c1 - YIconv1 * ihi)
+                    ilo = int(yMidGrid - YAIconv * ilo)
+                    ihi = int(yMidGrid - YAIconv * ihi)
                     if (ilo < Ymin):
                         ilo = Ymin
                     if (ilo > Ymax):
@@ -374,28 +338,28 @@ def MakeTimeTrace():
                     T1Iline.append(int(x1))
                     T1Iline.append(int(ihi))
                     ypi1 = ilo
-                ylo = cf.VBuffB[t] - cf.CHBVOffset
-                ilo = cf.IBuffB[t] - cf.CHBIOffset
+                ylo = cf.VBuffB[t] - cf.CHBVPos
+                ilo = cf.IBuffB[t] - cf.CHBIPos
                 yhi = ylo
                 ihi = ilo
                 n = t          
-                while n < (t + Tstep) and n < cf.NTrace:
+                while n < (t + Tstep) and n < cf.NSamples:
                     if ( cf.ShowC2_V.get() == 1 ):
-                        v = cf.VBuffB[t] - cf.CHBVOffset
+                        v = cf.VBuffB[t] - cf.CHBVPos
                         if v < ylo:
                             ylo = v
                         if v > yhi:
                             yhi = v
                     if ( cf.ShowC2_I.get() == 1 ):
-                        i = cf.IBuffB[t] - cf.CHBIOffset
+                        i = cf.IBuffB[t] - cf.CHBIPos
                         if i < ilo:
                             ilo = i
                         if i > ihi:
                             ihi = i
                     n = n + 1
                 if ( cf.ShowC2_V.get() == 1 ):
-                    ylo = int(c2 - Yconv2 * ylo)
-                    yhi = int(c2 - Yconv2 * yhi)
+                    ylo = int(yMidGrid - YBVconv * ylo)
+                    yhi = int(yMidGrid - YBVconv * yhi)
                     if (ylo < Ymin):
                         ylo = Ymin
                     if (ylo > Ymax):
@@ -411,8 +375,8 @@ def MakeTimeTrace():
                     T2Vline.append(int(yhi))
                     ypv2 = ylo
                 if ( cf.ShowC2_I.get() == 1 ):
-                    ilo = int(c2 - YIconv2 * ilo)
-                    ihi = int(c2 - YIconv2 * ihi)
+                    ilo = int(yMidGrid - YBIconv * ilo)
+                    ihi = int(yMidGrid - YBIconv * ihi)
                     if (ilo < Ymin):
                         ilo = Ymin
                     if (ilo > Ymax):
@@ -429,60 +393,54 @@ def MakeTimeTrace():
                 
                 if cf.MathTrace.get() > 0:
                     if cf.MathTrace.get() == 1: # plot sum of CA-V and CB-V
-                        y1 = int(c1 - Yconv1 * (cf.VBuffA[t] + cf.VBuffB[t] - cf.CHAVOffset))
+                        y1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] + cf.VBuffB[t] - cf.CHAVPos))
                     elif cf.MathTrace.get() == 2: # plot difference of CA-V and CB-V 
-                        y1 = int(c1 - Yconv1 * (cf.VBuffA[t] - cf.VBuffB[t] - cf.CHAVOffset))
+                        y1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] - cf.VBuffB[t] - cf.CHAVPos))
                     elif cf.MathTrace.get() == 3: # plot difference of CB-V and CA-V 
-                        y1 = int(c2 - Yconv2 * (cf.VBuffB[t] - cf.VBuffA[t] - cf.CHBVOffset))
+                        y1 = int(yMidGrid - YBVconv * (cf.VBuffB[t] - cf.VBuffA[t] - cf.CHBVPos))
                     elif cf.MathTrace.get() == 4: # plot product of CA-V and CA-I
                         Ypower = cf.VBuffA[t] * cf.IBuffA[t] # mAmps * Volts = mWatts
-                        ytemp = YIconv1 * (Ypower - cf.CHAIOffset)
-                        y1 = int(c1 - ytemp)                                            
+                        ytemp = YAIconv * (Ypower - cf.CHAIPos)
+                        y1 = int(yMidGrid - ytemp)                                            
                     elif cf.MathTrace.get() == 5: # plot product of CB-V and CB-I
                         Ypower = cf.VBuffB[t] * cf.IBuffB[t] # mAmps * Volts = mWatts
-                        ytemp = YIconv2 * (Ypower - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YBIconv * (Ypower - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 6: # plot ratio of CA-V and CA-I
                         Yohms = cf.VBuffA[t] / (cf.IBuffA[t] / 1000.0) #  Volts / Amps = ohms
-                        ytemp = YIconv1 * (Yohms- cf.CHAIOffset)
-                        y1 = int(c1 - ytemp)
+                        ytemp = YAIconv * (Yohms- cf.CHAIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 7: # plot ratio of CB-V and CB-I
                         Yohms = cf.VBuffB[t] / (cf.IBuffB[t] / 1000.0) #  Volts / Amps = ohms
-                        ytemp = YIconv2 * (Yohms - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YBIconv * (Yohms - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 8: # plot difference of CA-I and CB-I
                         Ydif = (cf.IBuffA[t] - cf.IBuffB[t]) #  in mA
-                        ytemp = YIconv1 * (Ydif - cf.CHAIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YAIconv * (Ydif - cf.CHAIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 9: # plot difference of CB-I and CA-I
                         Ydif = (cf.IBuffB[t] - cf.IBuffA[t])  # in mA
-                        ytemp = YIconv2 * (Ydif - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YBIconv * (Ydif - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 10: # plot ratio of CB-V and CA-V
                         try:
-                            y1 = int(c1 - Yconv2 * ((cf.VBuffB[t] / cf.VBuffA[t]) - cf.CHBVOffset)) #  voltage gain A to B
+                            y1 = int(yMidGrid - YBVconv * ((cf.VBuffB[t] / cf.VBuffA[t]) - cf.CHBVPos)) #  voltage gain A to B
                         except:
-                            y1 = int(c1 - Yconv2 * ((cf.VBuffB[t] / 0.000001) - cf.CHBVOffset))
+                            y1 = int(yMidGrid - YBVconv * ((cf.VBuffB[t] / 0.000001) - cf.CHBVPos))
                     elif cf.MathTrace.get() == 11: # plot ratio of CB-I and CA-I
                         try:
                             Y1 = (cf.IBuffB[t] / cf.IBuffA[t]) # current gain A to B
                         except:
                             Y1 = (cf.IBuffB[t] / 0.000001)
-                        ytemp = YIconv2 * (Y1 - cf.CHBIOffset)
-                        y1 = int(c2 - ytemp)
+                        ytemp = YBIconv * (Y1 - cf.CHBIPos)
+                        y1 = int(yMidGrid - ytemp)
                       
                     if (y1 < Ymin):
                         y1 = Ymin
                     if (y1 > Ymax):
-                        y1 = Ymax
-                    if (cf.ZOHold.get() == 1):
-                        Tmathline.append(int(x1))
-                        Tmathline.append(int(ypm))
-                        Tmathline.append(int(x1))
-                        Tmathline.append(int(y1))
-                    else:    
-                        Tmathline.append(int(x1))
-                        Tmathline.append(int(y1))
+                        y1 = Ymax   
+                    Tmathline.append(int(x1))
+                    Tmathline.append(int(y1))
                     ypm = y1
                 
             ft = ft + Tstep
@@ -497,24 +455,24 @@ def MakeTimeTrace():
                 x = cf.GRW
             x = x + Xstep
     # Make trigger triangle pointer
-    logging.warning('MakeTimeTrace(): Make trigger triangle pointer')
+    logging.debug('MakeTimeTrace(): Make trigger triangle pointer')
     Triggerline = []                # Trigger pointer
     Triggersymbol = []                # Trigger symbol
     if cf.TgInput.get() > 0:
         if cf.TgInput.get() == 1 : # triggering on CA-V
             x1 = cf.X0L
-            ytemp = Yconv1 * (float(cf.TRIGGERlevel)-cf.CHAVOffset) 
-            y1 = int(c1 - ytemp)
+            ytemp = YAVconv * (float(cf.TRIGGERlevel)-cf.CHAVPos) 
+            y1 = int(yMidGrid - ytemp)
         elif cf.TgInput.get() == 2:  # triggering on CA-I
             x1 = cf.X0L+cf.GRW
-            y1 = int(c1 - YIconv1 * (float(cf.TRIGGERlevel) - cf.CHAIOffset))
+            y1 = int(yMidGrid - YAIconv * (float(cf.TRIGGERlevel) - cf.CHAIPos))
         elif cf.TgInput.get() == 3:  # triggering on CB-V
             x1 = cf.X0L
-            ytemp = Yconv2 * (float(cf.TRIGGERlevel)-cf.CHBVOffset)          
-            y1 = int(c2 - ytemp)
+            ytemp = YBVconv * (float(cf.TRIGGERlevel)-cf.CHBVPos)          
+            y1 = int(yMidGrid - ytemp)
         elif cf.TgInput.get() == 4: # triggering on CB-I
             x1 = cf.X0L+cf.GRW
-            y1 = int(c2 - YIconv2 * (float(cf.TRIGGERlevel) - cf.CHBIOffset))
+            y1 = int(yMidGrid - YBIconv * (float(cf.TRIGGERlevel) - cf.CHBIPos))
             
         if (y1 < Ymin):
             y1 = Ymin
@@ -543,6 +501,8 @@ def MakeTimeTrace():
         Triggersymbol.append(int(Ymin+y2))
         Triggersymbol.append(int(x1+10))
         Triggersymbol.append(int(Ymin+y2))
+        
+        #logging.debug('T1Vline[100]={}'.format(T1Vline[100]))
 
 ## Update the time screen with traces and text   
 def MakeTimeScreen():
@@ -567,55 +527,7 @@ def MakeTimeScreen():
       
     Ymin = cf.Y0T                  # Minimum position of time grid (top)
     Ymax = cf.Y0T + cf.GRH            # Maximum position of time grid (bottom)
-    Tstep = (10.0 * cf.TIMEdiv) / cf.GRW # time in mS per pixel
-    # get the vertical ranges
-    try:
-        cf.CHAVScale = float(eval(cf.CHAsb.get()))
-    except:
-        cf.CHAsb.delete(0,tk.END)
-        cf.CHAsb.insert(0, cf.CHAVScale)
-    try:
-        cf.CHBVScale = float(eval(cf.CHBsb.get()))
-    except:
-        cf.CHBsb.delete(0,tk.END)
-        cf.CHBsb.insert(0, cf.CHBVScale)
-    try:
-        cf.CHAIScale = float(eval(cf.CHAIsb.get()))
-    except:
-        cf.CHAIsb.delete(0,tk.END)
-        cf.CHAIsb.insert(0, cf.CHAIScale)
-    try:
-        cf.CHBIScale = float(eval(cf.CHBIsb.get()))
-    except:
-        cf.CHBIsb.delete(0,tk.END)
-        cf.CHBIsb.insert(0, cf.CHBIScale)
-    # get the vertical offsets
-    try:
-        cf.CHAVOffset = float(eval(cf.CHAVPosEntry.get()))
-    except:
-        cf.CHAVPosEntry.delete(0,tk.END)
-        cf.CHAVPosEntry.insert(0, cf.CHAVOffset)
-    try:
-        cf.CHAIOffset = float(eval(cf.CHAIPosEntry.get()))
-    except:
-        cf.CHAIPosEntry.delete(0,tk.END)
-        cf.CHAIPosEntry.insert(0, cf.CHAIOffset)
-    try:
-        cf.CHBVOffset = float(eval(cf.CHBVPosEntry.get()))
-    except:
-        cf.CHBVPosEntry.delete(0,tk.END)
-        cf.CHBVPosEntry.insert(0, cf.CHBVOffset)
-    try:
-        cf.CHBIOffset = float(eval(cf.CHBIPosEntry.get()))
-    except:
-        cf.CHBIPosEntry.delete(0,tk.END)
-        cf.CHBIPosEntry.insert(0, cf.CHBIOffset)
-    # slide trace left right by cf.HozPos
-#    try:
-#        cf.HozPos = float(eval(cf.HozPosentry.get()))
-#    except:
-#        cf.HozPosentry.delete(0,tk.END)
-#        cf.HozPosentry.insert(0, cf.HozPos)      
+    Tstep = (10.0 * cf.TIMEdiv) / cf.GRW # time in mS per pixel    
     # prevent divide by zero error
     if cf.CHAVScale < 0.001:
         cf.CHAVScale = 0.001
@@ -667,22 +579,22 @@ def MakeTimeScreen():
             cf.ca.create_line(Dline, fill=COLORgrid, width=cf.GridWidth.get())
 
         if (cf.ShowC1_V.get() == 1 or cf.MathTrace.get() == 1 or cf.MathTrace.get() == 2 or MathFlag1):
-            Vaxis_value = (((5-i) * cf.CHAVScale ) + cf.CHAVOffset)
+            Vaxis_value = (((5-i) * cf.CHAVScale ) + cf.CHAVPos)
             Vaxis_label = str(round(Vaxis_value,3 ))
             cf.ca.create_text(x1-LeftOffset, y, text=Vaxis_label, fill=cf.COLORtrace1, anchor="e", font=("arial", cf.FontSize ))
             
         if (cf.ShowC1_I.get() == 1 or cf.MathTrace.get() == 4 or cf.MathTrace.get() == 6 or cf.MathTrace.get() == 8 or MathFlag3):
-            Iaxis_value = 1.0 * (((5-i) * cf.CHAIScale ) + cf.CHAIOffset)
+            Iaxis_value = 1.0 * (((5-i) * cf.CHAIScale ) + cf.CHAIPos)
             Iaxis_label = str(round(Iaxis_value, 3))
             cf.ca.create_text(x2+LeftOffset, y, text=Iaxis_label, fill=cf.COLORtrace3, anchor="w", font=("arial", cf.FontSize ))
             
         if (cf.ShowC2_V.get() == 1 or cf.MathTrace.get() == 3 or cf.MathTrace.get() == 10 or MathFlag2):
-            Vaxis_value = (((5-i) * cf.CHBVScale ) + cf.CHBVOffset)
+            Vaxis_value = (((5-i) * cf.CHBVScale ) + cf.CHBVPos)
             Vaxis_label = str(round(Vaxis_value, 3))
             cf.ca.create_text(x1-RightOffset+2, y, text=Vaxis_label, fill=cf.COLORtrace2, anchor="e", font=("arial", cf.FontSize )) # 26
             
         if (cf.ShowC2_I.get() == 1 or cf.MathTrace.get() == 5 or cf.MathTrace.get() == 7 or cf.MathTrace.get() == 9 or cf.MathTrace.get() == 11 or MathFlag4):
-            Iaxis_value = 1.0 * (((5-i) * cf.CHBIScale ) + cf.CHBIOffset)
+            Iaxis_value = 1.0 * (((5-i) * cf.CHBIScale ) + cf.CHBIPos)
             Iaxis_label = str(round(Iaxis_value, 3))
             cf.ca.create_text(x2+RightOffset+4, y, text=Iaxis_label, fill=cf.COLORtrace4, anchor="w", font=("arial", cf.FontSize )) # 28
         i = i + 1
@@ -749,7 +661,7 @@ def MakeTimeScreen():
         if cf.Is_Triggered == 1:
             TgLabel = TgLabel + " Triggered"
         else:
-            TgLabel = TgLabel + " Not Triggered"
+            TgLabel = TgLabel + " ++Not Triggered++"
             if cf.SingleShot.get() > 0:
                 TgLabel = TgLabel + " Armed"
         x = cf.X0L + (cf.GRW/2) + 12
@@ -762,26 +674,26 @@ def MakeTimeScreen():
 
     if cf.ShowCur.get() == 1:
         cf.MouseY = MouseCAV
-        Yconv1 = float(cf.GRH/10.0) / cf.CHAVScale
-        Yoffset1 = cf.CHAVOffset
+        YAVconv = float(cf.GRH/10.0) / cf.CHAVScale
+        Yoffset1 = cf.CHAVPos
         COLORmarker = cf.COLORtrace1
         Units = " V"
     if cf.ShowCur.get() == 2:
         cf.MouseY = MouseCBV
-        Yconv1 = float(cf.GRH/10.0) / cf.CHBVScale
-        Yoffset1 = cf.CHBVOffset
+        YAVconv = float(cf.GRH/10.0) / cf.CHBVScale
+        Yoffset1 = cf.CHBVPos
         COLORmarker = cf.COLORtrace2
         Units = " V"
     if cf.ShowCur.get() == 3:
         cf.MouseY = MouseCAI
-        Yconv1 = float(cf.GRH/10.0) / cf.CHAIScale
-        Yoffset1 = cf.CHAIOffset
+        YAVconv = float(cf.GRH/10.0) / cf.CHAIScale
+        Yoffset1 = cf.CHAIPos
         COLORmarker = cf.COLORtrace3
         Units = " mA"
     if cf.ShowCur.get() == 4:
         cf.MouseY = MouseCBI
-        Yconv1 = float(cf.GRH/10.0) / cf.CHBIScale
-        Yoffset1 = cf.CHBIOffset
+        YAVconv = float(cf.GRH/10.0) / cf.CHBIScale
+        Yoffset1 = cf.CHBIPos
         COLORmarker = cf.COLORtrace4
         Units = " mA"
     if cf.ShowCur.get() > 0: # Falls nicht "None" in UI ausgewählt
@@ -801,8 +713,8 @@ def MakeTimeScreen():
         cf.ca.create_text(cf.TCursor+2, cf.VCursor-10, text=V_label, fill=cf.COLORtext, anchor="w", font=("arial", cf.FontSize )) # Angabe Zeitwert Cursor Maus Rechtsklick
         Dline = [cf.X0L, cf.VCursor, cf.X0L+cf.GRW, cf.VCursor]
         cf.ca.create_line(Dline, dash=(4,3), fill=COLORmarker, width=cf.GridWidth.get())
-        c1 = cf.GRH / 2 + cf.Y0T    # fixed Y correction 
-        yvolts = ((cf.VCursor-c1)/Yconv1) - Yoffset1
+        yMidGrid = cf.GRH / 2 + cf.Y0T    # fixed Y correction 
+        yvolts = ((cf.VCursor-yMidGrid)/YAVconv) - Yoffset1
         V1String = ' {0:.3f} '.format(-yvolts)
         V_label = V1String + Units
         cf.ca.create_text(cf.TCursor+2, cf.VCursor+10, text=V_label, fill=COLORmarker, anchor="w", font=("arial", cf.FontSize )) # Angabe Signalwert Cursor Maus Rechtsklick
@@ -823,20 +735,26 @@ def MakeTimeScreen():
     # Textinformationen wie Messwerte, Samplingrate ober und unterhalb Oszibild
     #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     #--- oberhalb Oszibild
-    # Info Triggermodus und Abtastrate
-    txt = "Acquisition Mode: "
-    if cf.TRACEmodeTime.get() == 1:
-        txt = "Averaging "
-#    if cf.ManualTrigger.get() == 1:
-#        txt = "Manual Trigger "
-    if (cf.RUNstatus.get() == 0) or (cf.RUNstatus.get() == 3):
-        txt = "Stopped "
-    # Info Samplingrate
-    x = cf.X0L+2
+    x = cf.X0L + (cf.GRW) # Koordinaten für Textplatzierung
     y = 12
-    txt = txt + "   Sample Rate: " + str(cf.SampRate) + " S/s"
+    # Info Triggermodus und Abtastrate
+    txt = 'Normal'
+    if cf.TraceAvgMode.get() == 1:
+        txt = 'Averaging'
+    if (cf.RUNstatus.get() == 0) or (cf.RUNstatus.get() == 3):
+        txt = '++Stopped++'
+    # Darstellung Werte oberhalb Oszibild rechts
+    cf.ca.create_text(x, y, text=txt, anchor=tk.E, fill=cf.COLORtext)
+        
+    txt=''
+    x = cf.X0L+2 # Koordinaten für Textplatzierung
+    y = 12
+    # Info Samplingrate
+    txt = txt + "  Sample Rate: " + str(cf.SampRate/1000) + " kS/s"
+    # Info Anzahl Abtastpunkte
+    txt = txt + "  #Samples: " + str(cf.NSamples)
     # Info Horizontalskalierung
-    txt = txt + "   Horizontal Scale/Pos: "
+    txt = txt + "  Horiz Scale/Pos: "
     vx = cf.TIMEdiv
     if vx >= 1000:
         txt = txt + ' {0:.2f} '.format(vx / 1000.0) + " s/div"
@@ -852,7 +770,8 @@ def MakeTimeScreen():
         txt = txt + str(int(cf.HozPos)) + " ms "
     if abs(cf.HozPos) < 1:
         txt = txt + str(int(cf.HozPos * 1000.0)) + " us "
-    # Darstellung Werte oberhalb Oszibild
+
+    # Darstellung Werte oberhalb Oszibild links
     cf.ca.create_text(x, y, text=txt, anchor=tk.W, fill=cf.COLORtext)
     x2 = cf.X0L + cf.GRW
     #--- Unterhalb des Oszibildes
@@ -876,11 +795,11 @@ def MakeTimeScreen():
         txt = "CA-I: "
         txt = txt + str(cf.CHAIScale) + "mA/div"
     elif (cf.ShowC1_I.get() == 1 and cf.ShowC1_V.get() == 1):
-        txt = txt + "CA-I: "
+        txt = txt + "  CA-I: "
         txt = txt + str(cf.CHAIScale) + "mA/div"
     if cf.ShowC1_I.get() == 1:
         if cf.MeasDCI1.get() == 1:
-            V1String = '{0:.2f} '.format(DCI1)
+            V1String = '{0:.2f} '.format(cf.DCI1)
             txt = txt + " AvgI=" + V1String
         if cf.MeasMaxI1.get() == 1:
             txt = txt +  " MaxI=" + '{0:.2f} '.format(cf.MaxI1)
@@ -915,7 +834,7 @@ def MakeTimeScreen():
         txt = "CB-I: "
         txt = txt + str(cf.CHBIScale) + " mA/div"
     elif (cf.ShowC2_I.get() == 1 and cf.ShowC2_V.get() == 1):
-        txt = txt + "CB-I: "
+        txt = txt + "  CB-I: "
         txt = txt + str(cf.CHBIScale) + " mA/div"
     if cf.ShowC2_I.get() == 1:
         if cf.MeasDCI2.get() == 1:

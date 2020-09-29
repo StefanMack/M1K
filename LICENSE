@@ -1,7 +1,7 @@
 This software is based on the open source code of AliceDesktop 1.3, see https://github.com/analogdevicesinc/alice/tree/Version-1.3.
 It is a further development in the sense that only a minimal range of functions was taken over and the source code was restructured.
 
-All rights of AliceDesktrop are reserved by Analog Devices, Inc., see https://github.com/analogdevicesinc/alice/blob/master/LICENSE_ADIBSD.
+All rights of AliceDesktop are reserved by Analog Devices, Inc., see https://github.com/analogdevicesinc/alice/blob/master/LICENSE_ADIBSD.
 Under this link, the relevant license terms are defined by Analog Devices Inc. as follows (quote):
 
 "Redistribution and use in source and binary forms, with or without modification,

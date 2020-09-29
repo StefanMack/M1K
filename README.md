@@ -27,4 +27,4 @@ https://www.magentacloud.de/lnk/g5ghlwLR
 Download Installationsdatei für M1K-Treiber, libsmu-Bibliothek (1.0.2) und Python-Bibliothek pysmu:  
 https://www.magentacloud.de/lnk/TfgBl3C0
 
-Eine PDF-Installationsanleitung für Windows 10 finden Sie im Verzeichnis "aliceLite" in diesem Repository.
+Eine PDF-Installationsanleitung für Windows 10 und Ubuntu-Linux finden Sie im Verzeichnis "aliceLite" in diesem Repository.

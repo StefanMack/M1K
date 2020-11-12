@@ -5,29 +5,15 @@
 # Based on Code wirtten by D Mercer ()
 # https://github.com/analogdevicesinc/alice/tree/Version-1.3
 #
-# Version 0.4, fourth release version:
-# Unsinnige Eingaben Trace/Grid Width abfangen >OK
-# Number of Samples über den Grid angeben >OK
-# 0,2 ms/Div und Trace Average stabil machen >OK
-# Bei Cursor Tooltip explizit Rechts-/Links-Klick erklären >OK
-# Export CSV-Datei Zeit "s" statt "ms" >OK
-# Spinbox mit Samplingraten 200.000, 100.000, 50.000, 20.000, 10.000, 5.000 >OK
-# Unsinnige Eingaben Calibrate CA-I/CB-I genau wie bei CV abfangen >OK
-# 200 kS/s nicht direkt an devx weitergeben >OK
-# Divide by zero für DY abfangen, DY in deltaY umbenennen >OK
-# Bei "Not Triggered" soll Trace nicht mehr wackeln >OK
-# "Not Triggered" und "Stopped" über Grid auffälliger mit '++  ++' darstellen >OK
-# Math-Trace nur darstellen wenn CA und CB aktiv >OK
-# Tooltips bei Eingabefelder Menüpunkt Settings von Options >OK
-# Eingabefenster Horz. Scale nur in Liste vorgegebene Werte zulassen >OK
-# Eingabefenster reagieren nur auf <return> und nicht schon auf Texteingabe (so wie im AWG-Munü) >OK
-# Bei mehr Abtastpunkten als Darstellungspixel und Z-O-Hold und Math Absturz >OK
-# Bei Einstellungen Vertikal/Horizontalskalierung bzw. -offset sWerte jeweils rechts neben den Bezeichnern erscheinen >OK
+# Version 0.5, fifth release version:
 
-# Strommessung: CA unc CB 50 mA erscheinen beu 200 kS/s als 250 mA egal ob DC oder Sinussignal
+# Strommessung: CA unc CB 50 mA erscheinen bei 200 kS/s als 250 mA egal ob DC oder Sinussignal >ToDo
+# 200 kS/s wird nicht auf 100 kS/s reduziert, wenn ein dritter Kanal aktiviert wird >ToDo
+# Bei Kreuzchen-Cursor ms statt mS für Millisekunde >OK
+# Links-Klick-Cursor zeigt falsche y-Werte an >OK
 
 # *****************************************************************************
-# Light Version alice-desctop 0.4, S. Mack, 23.9.2020
+# Light Version alice-desctop 0.5, S. Mack, 12.11.2020
 # *****************************************************************************
 
 import time
@@ -54,8 +40,8 @@ BTrigger50p, BTriglevel)
 logging.basicConfig(level=30)
 logging.basicConfig(filename='logDatei.log', level=40)
 
-RevDate = "(22 Sep 2020)"
-SWRev = "0.4 "
+RevDate = "(12 Nov 2020)"
+SWRev = "0.5 "
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
 VScaleVals = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
@@ -145,8 +131,9 @@ def onCanvasClickRight(event): # Cursorkreuz setzen
         UpdateTimeScreen()
 
 
-#--- Setzen von Markern via Maus-Linksklick, deren xy-Koordinaten grün im Scanbild erscheinen
-#--- funktioniert nur im Stopp-Modus
+#--- Setzen kleiner Cursor-Kreuze (Markern) via Maus-Linksklick (nur stop), 
+#---  deren xy-Koordinaten grün im Scanbild erscheinen
+#--- !!funktioniert nur im Stopp-Modus!!
 def onCanvasClickLeft(event):
     logging.debug("onCanvasClickLeft() x={0} y={1}".format(event.x, event.y))
     global PrevV, PrevT
@@ -171,64 +158,70 @@ def onCanvasClickLeft(event):
             cf.CHAIScale = 1.0
         if cf.CHBIScale < 1.0:
             cf.CHBIScale = 1.0
-        Yoffset1 = cf.CHAVOffset
+        #YSignOff = cf.CHAVOffset # Wieso nicht 0?
+        YSignOff = 0.0
         if cf.ShowCur.get() == 1:
-            Yconv1 = float(cf.GRH/10.0) / cf.CHAVScale
-            Yoffset1 = cf.CHAVOffset
+            Yconv = float(cf.GRH/10.0) / cf.CHAVScale
+            #YSignOff = cf.CHAVOffset
+            YSignOff = cf.CHAVPos
             COLORmarker = cf.COLORtrace1
             Units = " V"
         elif cf.ShowCur.get() == 2:
-            Yconv1 = float(cf.GRH/10.0) / cf.CHBVScale
-            Yoffset1 = cf.CHBVOffset
+            Yconv = float(cf.GRH/10.0) / cf.CHBVScale
+            YSignOff = cf.CHBVPos
             COLORmarker = cf.COLORtrace2
             Units = " V"
         elif cf.ShowCur.get() == 3:
-            Yconv1 = float(cf.GRH/10.0) / cf.CHAIScale
-            Yoffset1 = cf.CHAIOffset
+            Yconv = float(cf.GRH/10.0) / cf.CHAIScale
+            YSignOff = cf.CHAIPos
             COLORmarker = cf.COLORtrace3
             Units = " mA"
         elif cf.ShowCur.get() == 4:
-            Yconv1 = float(cf.GRH/10.0) / cf.CHBIScale
-            Yoffset1 = cf.CHAIOffset
+            Yconv = float(cf.GRH/10.0) / cf.CHBIScale
+            YSignOff = cf.CHAIPos
             COLORmarker = cf.COLORtrace4
             Units = " mA"
             
-        c1 = cf.GRH / 2.0 + cf.Y0T
+        yMid = cf.GRH / 2.0 + cf.Y0T # absolute Y-Pixelposition Mittellinie Grid
         # draw X at marker point and number
         cf.ca.create_line(event.x-4, event.y-4,event.x+4, event.y+5, fill=cf.COLORtext)
         cf.ca.create_line(event.x+4, event.y-4,event.x-4, event.y+5, fill=cf.COLORtext)
         Tstep = (10.0 * cf.TIMEdiv) / cf.GRW # time in mS per pixel
         Tpoint = ((event.x-cf.X0L) * Tstep)
-
+        # Angabe Zeit und Spannungswert sowie Differenzen davon
         Tpoint = Tpoint
         if Tpoint >= 1000:
             axis_value = Tpoint / 1000.0
-            TString = ' {0:.2f} '.format(axis_value) + " S "
+            TString = ' {0:.2f} '.format(axis_value) + " s "
         if Tpoint < 1000 and Tpoint >= 1:
             axis_value = Tpoint
-            TString = ' {0:.2f} '.format(axis_value) + " mS "
+            TString = ' {0:.2f} '.format(axis_value) + " ms "
         if Tpoint < 1:
             axis_value = Tpoint * 1000.0
-            TString = ' {0:.2f} '.format(axis_value) + " uS "
-        yvolts = ((event.y-c1)/Yconv1) - Yoffset1
-        V1String = ' {0:.3f} '.format(-yvolts)
+            TString = ' {0:.2f} '.format(axis_value) + " us "
+        
+        ySign = ((yMid - event.y)/Yconv + YSignOff) # Mausposition in V/mA umrechnen
+        logging.debug("Marker y-Value  event.y={0} ySign={1} Yconv={2} YSignOff={3} cf.GRH={4}".format(event.y, ySign, Yconv, YSignOff, cf.GRH))
+        V1String = ' {0:.3f} '.format(ySign)
 
         V_label = str(cf.MarkerNum) + " " + TString + V1String
         V_label = V_label + Units
-        if cf.MarkerNum > 1:
-            DeltaV = ' {0:.3f} '.format(PrevV-yvolts)
+        if cf.MarkerNum > 1: # ab dem zweiten Marker
+            DeltaV = ' {0:.3f} '.format(PrevV-ySign)
 
             DT = (Tpoint-PrevT)
             if Tpoint >= 1000:
                 axis_value = DT / 1000.0
-                DeltaT = ' {0:.2f} '.format(axis_value) + " S "
+                DeltaT = ' {0:.2f} '.format(axis_value) + " s "
             if Tpoint < 1000 and Tpoint >= 1:
                 axis_value = DT
-                DeltaT = ' {0:.2f} '.format(axis_value) + " mS "
+                DeltaT = ' {0:.2f} '.format(axis_value) + " ms "
             if Tpoint < 1:
                 axis_value = DT * 1000.0
-                DeltaT = ' {0:.2f} '.format(axis_value) + " uS "
-            DFreq = ' {0:.3f} '.format(1.0/(Tpoint-PrevT))
+                DeltaT = ' {0:.2f} '.format(axis_value) + " us "
+            if((Tpoint-PrevT) != 0):
+                DFreq = ' {0:.3f} '.format(1.0/(Tpoint-PrevT))
+            else: DFreq = ' inf '
             V_label = V_label + " Delta " + DeltaT + DeltaV
             V_label = V_label + Units
             V_label = V_label + ", Freq " + DFreq + " KHz"
@@ -238,7 +231,7 @@ def onCanvasClickLeft(event):
         Justify = 'w'
         cf.ca.create_text(event.x+4, event.y, text=str(cf.MarkerNum), fill=cf.COLORtext, anchor=Justify, font=("arial", cf.FontSize ))
         cf.ca.create_text(x, y, text=V_label, fill=COLORmarker, anchor=Justify, font=("arial", cf.FontSize ))
-        PrevV = yvolts
+        PrevV = ySign
         PrevT = Tpoint
         
     
@@ -812,7 +805,7 @@ prlab = ttk.Label(frame2r, text="Calibrate Gain / Offset")
 prlab.pack(side=tk.TOP, pady=(8,0))
 ProbeA = ttk.Frame(frame2r)
 ProbeA.pack(side=tk.TOP)
-gain1lab = ttk.Label(ProbeA, text="CA-V")
+gain1lab = ttk.Label(ProbeA, text="CA-V (V)")
 gain1lab.pack(side=tk.LEFT)
 
 cf.CHAVGainEntry = tk.Entry(ProbeA, width=6)
@@ -829,7 +822,7 @@ cf.CHAVOffsetEntry.insert(0,0.0)
 
 ProbeB = ttk.Frame( frame2r )
 ProbeB.pack(side=tk.TOP)
-gain2lab = ttk.Label(ProbeB, text="CB-V")
+gain2lab = ttk.Label(ProbeB, text="CB-V (V)")
 gain2lab.pack(side=tk.LEFT)
 
 cf.CHBVGainEntry = tk.Entry(ProbeB, width=6)
@@ -846,7 +839,7 @@ cf.CHBVOffsetEntry.insert(0,0.0)
 
 ProbeAI = ttk.Frame( frame2r )
 ProbeAI.pack(side=tk.TOP)
-gainailab = ttk.Label(ProbeAI, text="CA-I")
+gainailab = ttk.Label(ProbeAI, text="CA-I (mA)")
 gainailab.pack(side=tk.LEFT)
 
 cf.CHAIGainEntry = tk.Entry(ProbeAI, width=6)
@@ -863,7 +856,7 @@ cf.CHAIOffsetEntry.insert(0,0.0)
 
 ProbeBI = ttk.Frame( frame2r )
 ProbeBI.pack(side=tk.TOP)
-gainbilab = ttk.Label(ProbeBI, text="CB-I")
+gainbilab = ttk.Label(ProbeBI, text="CB-I (mA)")
 gainbilab.pack(side=tk.LEFT)
 
 cf.CHBIGainEntry = tk.Entry(ProbeBI, width=6)

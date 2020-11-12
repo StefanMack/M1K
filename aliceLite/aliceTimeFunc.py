@@ -668,7 +668,7 @@ def MakeTimeScreen():
         cf.ca.create_text(x, Ymin-cf.FontSize, text=TgLabel, fill=cf.COLORtrigger, anchor="w", font=("arial", cf.FontSize ))
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Setzen der Zeit-/Signalcursor bei Rechtsklick auf Oszibild
+# Setzen der Zeit-/Signalcursorkreuz bei Rechtsklick auf Oszibild (run und stop)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++   
     #--- Zeit-/Signalcursor falls in UI für den ausgewählten Trace zeichnen
 

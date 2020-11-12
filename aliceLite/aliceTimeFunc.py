@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 22.9.20
+S. Mack, 12.11.20
 """
 import tkinter as tk
 import config as cf

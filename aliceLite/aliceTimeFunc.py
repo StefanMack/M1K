@@ -710,14 +710,14 @@ def MakeTimeScreen():
         if Tpoint < 1:
             axis_value = Tpoint * 1000.0
             V_label = ' {0:.2f} '.format(axis_value) + " us"
-        cf.ca.create_text(cf.TCursor+2, cf.VCursor-10, text=V_label, fill=cf.COLORtext, anchor="w", font=("arial", cf.FontSize )) # Angabe Zeitwert Cursor Maus Rechtsklick
+        cf.ca.create_text(cf.TCursor+2, cf.VCursor-10, text=V_label, fill=cf.COLORtext, anchor="w", font=("arial", cf.FontSize, tk.font.BOLD )) # Angabe Zeitwert Cursor Maus Rechtsklick
         Dline = [cf.X0L, cf.VCursor, cf.X0L+cf.GRW, cf.VCursor]
         cf.ca.create_line(Dline, dash=(4,3), fill=COLORmarker, width=cf.GridWidth.get())
         yMidGrid = cf.GRH / 2 + cf.Y0T    # fixed Y correction 
         yvolts = ((cf.VCursor-yMidGrid)/YAVconv) - Yoffset1
         V1String = ' {0:.3f} '.format(-yvolts)
         V_label = V1String + Units
-        cf.ca.create_text(cf.TCursor+2, cf.VCursor+10, text=V_label, fill=COLORmarker, anchor="w", font=("arial", cf.FontSize )) # Angabe Signalwert Cursor Maus Rechtsklick
+        cf.ca.create_text(cf.TCursor+2, cf.VCursor+10, text=V_label, fill=COLORmarker, anchor="w", font=("arial", cf.FontSize, tk.font.BOLD)) # Angabe Signalwert Cursor Maus Rechtsklick
  
     SmoothBool = cf.SmoothCurves.get()
     # Write the traces if available
@@ -781,7 +781,7 @@ def MakeTimeScreen():
         txt = "CA-V: "
         txt = txt + str(cf.CHAVScale) + " V/div"
         if cf.MeasDCV1.get() == 1: 
-            txt = txt + " AvgV=" + '{0:.4f} '.format(cf.DCV1)
+            txt = txt + " AvgV=" + '{0:.5f} '.format(cf.DCV1)
         if cf.MeasMaxV1.get() == 1:
             txt = txt +  " MaxV=" + '{0:.4f} '.format(cf.MaxV1)
         if cf.MeasMinV1.get() == 1:
@@ -820,7 +820,7 @@ def MakeTimeScreen():
         txt = "CB-V: "
         txt = txt + str(cf.CHBVScale) + " V/div"
         if cf.MeasDCV2.get() == 1:
-            txt = txt + " AvgV=" + '{0:.4f} '.format(cf.DCV2)
+            txt = txt + " AvgV=" + '{0:.5f} '.format(cf.DCV2)
         if cf.MeasMaxV2.get() == 1:
             txt = txt +  " MaxV=" + '{0:.4f} '.format(cf.MaxV2)
         if cf.MeasMinV2.get() == 1:

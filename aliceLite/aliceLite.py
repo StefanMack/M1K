@@ -11,9 +11,11 @@
 # 200 kS/s wird nicht auf 100 kS/s reduziert, wenn ein dritter Kanal aktiviert wird >ToDo
 # Bei Kreuzchen-Cursor ms statt mS für Millisekunde >OK
 # Links-Klick-Cursor zeigt falsche y-Werte an >OK
+# Cursorwerte fett und mit groeßerer Schrift darstellen >OK
+# Messfunktion Avg für Spannung soll 0,01 mV auflösen >OK
 
 # *****************************************************************************
-# Light Version alice-desctop 0.5, S. Mack, 12.11.2020
+# Light Version alice-desctop 0.5, S. Mack, 12.12.2020
 # *****************************************************************************
 
 import time
@@ -165,22 +167,22 @@ def onCanvasClickLeft(event):
             #YSignOff = cf.CHAVOffset
             YSignOff = cf.CHAVPos
             COLORmarker = cf.COLORtrace1
-            Units = " V"
+            Units = " V   "
         elif cf.ShowCur.get() == 2:
             Yconv = float(cf.GRH/10.0) / cf.CHBVScale
             YSignOff = cf.CHBVPos
             COLORmarker = cf.COLORtrace2
-            Units = " V"
+            Units = " V   "
         elif cf.ShowCur.get() == 3:
             Yconv = float(cf.GRH/10.0) / cf.CHAIScale
             YSignOff = cf.CHAIPos
             COLORmarker = cf.COLORtrace3
-            Units = " mA"
+            Units = " mA   "
         elif cf.ShowCur.get() == 4:
             Yconv = float(cf.GRH/10.0) / cf.CHBIScale
             YSignOff = cf.CHAIPos
             COLORmarker = cf.COLORtrace4
-            Units = " mA"
+            Units = " mA   "
             
         yMid = cf.GRH / 2.0 + cf.Y0T # absolute Y-Pixelposition Mittellinie Grid
         # draw X at marker point and number
@@ -192,19 +194,19 @@ def onCanvasClickLeft(event):
         Tpoint = Tpoint
         if Tpoint >= 1000:
             axis_value = Tpoint / 1000.0
-            TString = ' {0:.2f} '.format(axis_value) + " s "
+            TString = ' {0:.2f} '.format(axis_value) + " s, "
         if Tpoint < 1000 and Tpoint >= 1:
             axis_value = Tpoint
-            TString = ' {0:.2f} '.format(axis_value) + " ms "
+            TString = ' {0:.2f} '.format(axis_value) + " ms, "
         if Tpoint < 1:
             axis_value = Tpoint * 1000.0
-            TString = ' {0:.2f} '.format(axis_value) + " us "
+            TString = ' {0:.2f} '.format(axis_value) + " us, "
         
         ySign = ((yMid - event.y)/Yconv + YSignOff) # Mausposition in V/mA umrechnen
         logging.debug("Marker y-Value  event.y={0} ySign={1} Yconv={2} YSignOff={3} cf.GRH={4}".format(event.y, ySign, Yconv, YSignOff, cf.GRH))
         V1String = ' {0:.3f} '.format(ySign)
 
-        V_label = str(cf.MarkerNum) + " " + TString + V1String
+        V_label = str(cf.MarkerNum) + ":  Pos: " + TString + V1String
         V_label = V_label + Units
         if cf.MarkerNum > 1: # ab dem zweiten Marker
             DeltaV = ' {0:.3f} '.format(PrevV-ySign)
@@ -212,25 +214,25 @@ def onCanvasClickLeft(event):
             DT = (Tpoint-PrevT)
             if Tpoint >= 1000:
                 axis_value = DT / 1000.0
-                DeltaT = ' {0:.2f} '.format(axis_value) + " s "
+                DeltaT = ' {0:.2f} '.format(axis_value) + " s, "
             if Tpoint < 1000 and Tpoint >= 1:
                 axis_value = DT
-                DeltaT = ' {0:.2f} '.format(axis_value) + " ms "
+                DeltaT = ' {0:.2f} '.format(axis_value) + " ms, "
             if Tpoint < 1:
                 axis_value = DT * 1000.0
-                DeltaT = ' {0:.2f} '.format(axis_value) + " us "
+                DeltaT = ' {0:.2f} '.format(axis_value) + " us, "
             if((Tpoint-PrevT) != 0):
                 DFreq = ' {0:.3f} '.format(1.0/(Tpoint-PrevT))
             else: DFreq = ' inf '
-            V_label = V_label + " Delta " + DeltaT + DeltaV
+            V_label = V_label + " Delta: " + DeltaT + DeltaV
             V_label = V_label + Units
-            V_label = V_label + ", Freq " + DFreq + " KHz"
+            V_label = V_label + "  Freq: " + DFreq + " KHz"
         # place in upper left unless specified otherwise
         x = cf.X0L + 5
         y = cf.Y0T + 3 + (cf.MarkerNum*12)
         Justify = 'w'
-        cf.ca.create_text(event.x+4, event.y, text=str(cf.MarkerNum), fill=cf.COLORtext, anchor=Justify, font=("arial", cf.FontSize ))
-        cf.ca.create_text(x, y, text=V_label, fill=COLORmarker, anchor=Justify, font=("arial", cf.FontSize ))
+        cf.ca.create_text(event.x+4, event.y, text=str(cf.MarkerNum), fill=cf.COLORtext, anchor=Justify, font=("arial", cf.FontSize, tk.font.BOLD ))
+        cf.ca.create_text(x, y, text=V_label, fill=COLORmarker, anchor=Justify, font=("arial", cf.FontSize, tk.font.BOLD ))
         PrevV = ySign
         PrevT = Tpoint
         

@@ -25,7 +25,7 @@ import tkinter.ttk as ttk # nötig für Widget Styles
 from tkinter.filedialog import asksaveasfilename
 import pysmu as smu # auskommentiert, wenn kein M1K angeschlossen
 import config as cf # hier stehen alle ehemaligen globalen Variablen drin
-from aliceIcons import hipulse, lowpulse # Bilddateien der Icons
+from aliceIcons import hipulse, lowpulse, oszi # Bilddateien der Icons
 # Thinter UI Menüs
 from aliceMenus import MakeSettingsMenu, CreateToolTip, MakeAWGMenu
 # Samplingfunktionen des M1K
@@ -68,7 +68,8 @@ default_font.configure(size=cf.FontSize)
 
 cf.root.title("smuc v0.6 (3.1.2021)")
 
-img = tk.PhotoImage(file='IconOszi_80x80.png') # Programm Icon
+#img = tk.PhotoImage(file='IconOszi_80x80.png') # Programm Icon
+img = tk.PhotoImage(data=oszi) # Programm Icon
 hipulseimg = tk.PhotoImage(data=hipulse) # Icon für Trigger Rising Edge
 lowpulseimg = tk.PhotoImage(data=lowpulse) # Icon für Trigger Falling Edge
 cf.root.call('wm', 'iconphoto', cf.root._w, '-default', img)

@@ -3,7 +3,7 @@
 """
 Enthält die für alle Module zugreifbaren globalen Variablen
 Später werden daraus Attribute der Objekte...
-S. Mack, 22.9.20
+S. Mack, 28.12.20
 """
 import tkinter as tk
 import numpy as np
@@ -18,7 +18,7 @@ CHA = CHB = None # M1K Instanzen für die beiden Kanäle A und B
 DevID = "No Device" # Seriennummer des M1K bzw. dieser String falls kein M1K angeschlossen
 running = 1 # wechselt auf 0, wenn exit-Button angeklickt oder Fenster geschlossen wird
 
-FontSize = 8 # Fontgröße falls nicht woanders wie in Styles explizit angegeben
+FontSize = 9 # Fontgröße falls nicht woanders wie in Styles explizit angegeben
 GRW = 720 # Width of the time grid 720 default, X-Richtung geht nach Rechts
 GRH = 390 # Height of the time grid 390 default, Y-Richtung geht nach Unten
 X0L = FontSize * 7 # Minimum X-Postion des Grids, (Position linke Seite)
@@ -35,7 +35,6 @@ SampRateList = (10000, 20000, 50000, 100000, 200000)
 SampRate = 100000 # maximaler Wert kann noch verdoppelt werden falls Mux<=2
 SampRatesb = None # Eingabe-Spinbox für die Samplingrate
 
-Two_X_Sample = 0 # wird 1 bei 200 kS/s
 NSamples = 6000 # Anzahl der Abtastpunkte (3x Anzeigebereich Grid) (durch 4 teilbar, da Triggerereignis nur zwischen 0,25...0,75 gesucht wird)
 MinSamples = 6000 # Minimale Zahl Samples für Darstellung (# Hardwaresamples pro Loop)
 MaxSamples = 90000 # Maximale Zahl Samples für Darstellung (# Hardwaresamples pro Loop)
@@ -168,8 +167,7 @@ TgEdge = tk.IntVar(0)   # Triggerflanke steigend oder fallend
 TgEdge.set(0)
 
 #--- Abtastung, Acquire, Cursor
-ADC_Mux_Mode = tk.IntVar(0) # Wert 0...5 je nachdem welche Zweier-Signalkombination gesampelt wird
-ADC_Mux_Mode.set(0) # bis 2-fach Mux 200 kS/s falls im Samplerate-Menü ausgewählt
+ADC_Mux_Mode = 0 # Wert 0...5 je nachdem welche Zweier-Signalkombination gesampelt wird
 NAveTrace = tk.IntVar(0)
 NAveTrace.set(8) # Anzahl Mittelungen Sampingperioden im Average-Modus
 TraceAvgMode = tk.IntVar(0) # Flag für Average-Modus

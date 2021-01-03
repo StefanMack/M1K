@@ -5,17 +5,15 @@
 # Based on Code wirtten by D Mercer ()
 # https://github.com/analogdevicesinc/alice/tree/Version-1.3
 #
-# Version 0.5, fifth release version:
-
-# Strommessung: CA unc CB 50 mA erscheinen bei 200 kS/s als 250 mA egal ob DC oder Sinussignal >ToDo
-# 200 kS/s wird nicht auf 100 kS/s reduziert, wenn ein dritter Kanal aktiviert wird >ToDo
-# Bei Kreuzchen-Cursor ms statt mS für Millisekunde >OK
-# Links-Klick-Cursor zeigt falsche y-Werte an >OK
-# Cursorwerte fett und mit groeßerer Schrift darstellen >OK
-# Messfunktion Avg für Spannung soll 0,01 mV auflösen >OK
+# Version 0.6, sixth release version: Last Version named "AliceLite"
+# --> Future versions will be named "smuc" due to ADI copy right issues.
+'''
+Bugs:
+- derzeit keine :-))
+'''
 
 # *****************************************************************************
-# Light Version alice-desctop 0.5, S. Mack, 12.12.2020
+# smuc Version 0.6, S. Mack, 2.1.2021
 # *****************************************************************************
 
 import time
@@ -27,14 +25,14 @@ import tkinter.ttk as ttk # nötig für Widget Styles
 from tkinter.filedialog import asksaveasfilename
 import pysmu as smu # auskommentiert, wenn kein M1K angeschlossen
 import config as cf # hier stehen alle ehemaligen globalen Variablen drin
-from aliceIcons import hipulse, lowpulse, TBicon # Bilddateien der Icons
+from aliceIcons import hipulse, lowpulse # Bilddateien der Icons
 # Thinter UI Menüs
 from aliceMenus import MakeSettingsMenu, CreateToolTip, MakeAWGMenu
 # Samplingfunktionen des M1K
 import aliceM1kSamp as m1k
 # Oszillsokopfunktionen
-from aliceOsciFunc import (BStop, BTime, BHozPoss,
-BStart, UpdateTimeAll, UpdateTimeTrace, UpdateTimeScreen,
+from aliceOsciFunc import (stop_samp, set_hscale, set_hpos,
+start_samp, UpdateTimeAll, UpdateTimeTrace, UpdateTimeScreen,
 BTrigger50p, BTriglevel)
 
 # Nachfolgende Zeile für Debugmeldungen ausschalten (level=0 bedeutet alle Meldungen)
@@ -42,13 +40,11 @@ BTrigger50p, BTriglevel)
 logging.basicConfig(level=30)
 logging.basicConfig(filename='logDatei.log', level=40)
 
-RevDate = "(12 Nov 2020)"
-SWRev = "0.5 "
 
 # Vertical Sensitivity list in v/div "Channel Voltage Per Division"
-VScaleVals = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
+v_scale_vals = (0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0)
 # Vertical Sensitivity list in mA/div und Defaultwert "Channel I(Current) Per Division"
-IScaleVals = (0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0)
+i_scale_vals = (0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0)
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -70,17 +66,17 @@ except:
 default_font = tkf.nametofont("TkDefaultFont")
 default_font.configure(size=cf.FontSize)
 
-cf.root.title("AliceLite " + SWRev + RevDate)
+cf.root.title("smuc v0.6 (3.1.2021)")
 
-img = tk.PhotoImage(data=TBicon) # Programm Icon
+img = tk.PhotoImage(file='IconOszi_80x80.png') # Programm Icon
 hipulseimg = tk.PhotoImage(data=hipulse) # Icon für Trigger Rising Edge
 lowpulseimg = tk.PhotoImage(data=lowpulse) # Icon für Trigger Falling Edge
 cf.root.call('wm', 'iconphoto', cf.root._w, '-default', img)
 
-COLORframes = "#000080" # Color = "#rrggbb" rr=red gg=green bb=blue, Hexadecimal values 00 - ff
-COLORcanvas = "#000000" # 100% black
+#FRAME_COLOR = "#000080" 
+CANVAS_COLOR = "#000000" # "#rrggbb" rr=red gg=green bb=blue, Hexadecimal values 00 - ff
  
-SCstart = 0 # Start sample of the trace
+#SCstart = 0 # Start sample of the trace
 
 #--- Eigene Styles für Buttons verschiedener Breite
 cf.root.style.configure("W3.TButton", width=3, relief=tk.RAISED) # "W" steht für width
@@ -112,9 +108,9 @@ cf.root.style.configure("A10R1.TLabelframe.Label", foreground=cf.COLORtrace5, fo
 cf.root.style.configure("A10R1.TLabelframe", borderwidth=5, relief=tk.RIDGE)
 cf.root.style.configure("A10R2.TLabelframe.Label", foreground=cf.COLORtraceR2, font=('Arial', 10, 'bold'))
 cf.root.style.configure("A10R2.TLabelframe", borderwidth=5, relief=tk.RIDGE)
-cf.root.style.configure("A10B.TLabel", foreground=COLORcanvas, font="Arial 10 bold") # Black text
+cf.root.style.configure("A10B.TLabel", foreground=CANVAS_COLOR, font="Arial 10 bold") # Black text
 cf.root.style.configure("A10R.TLabel", foreground=cf.ButtonRed, font="Arial 10 bold") # Red text
-cf.root.style.configure("A12B.TLabel", foreground=COLORcanvas, font="Arial 12 bold") # Black text
+cf.root.style.configure("A12B.TLabel", foreground=CANVAS_COLOR, font="Arial 12 bold") # Black text
 # Checkbuttons zum Ein-/Ausschalten der vier Traces rechts neben Oszibild
 cf.root.style.configure("Strace1.TCheckbutton", background=cf.COLORtrace1)
 cf.root.style.configure("Strace2.TCheckbutton", background=cf.COLORtrace2)
@@ -260,9 +256,9 @@ def onSrateScroll(event): # Samplingrateeinstellung
     onSpinBoxScroll(event)
     m1k.SetSampleRate()
     
-def onRetSrate(event): # <return> bei Samplingrateeinstellung
-    logging.debug('onRetSrate()')
-    m1k.SetSampleRate()
+#def onRetSrate(event): # <return> bei Samplingrateeinstellung
+#    logging.debug('onRetSrate()')
+#    m1k.SetSampleRate()
     
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -270,40 +266,25 @@ def onRetSrate(event): # <return> bei Samplingrateeinstellung
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
 #--- Vertikalskalierung
 def SetCHAVScale():
-    try:
-        cf.CHAVScale = float(eval(cf.CHAVsb.get()))
-    except:
-        cf.CHAVsb.delete(0,tk.END)
-        cf.CHAVsb.insert(0, cf.CHAVScale)
+    cf.CHAVScale = float(eval(cf.CHAVsb.get()))
     logging.debug('SetCHAVScale() with CHAVScale={}'.format(cf.CHAVScale))
-    UpdateTimeTrace()           # Always Update
+    UpdateTimeTrace() # Aenderung im Scopebild aktivieren
 
 def SetCHAIScale():
-    logging.debug('SetCHAIScale()')
-    try:
-        cf.CHAIScale = float(eval(cf.CHAIsb.get()))
-    except:
-        cf.CHAIsb.delete(0,tk.END)
-        cf.CHAIsb.insert(0, cf.CHAIScale)
-    UpdateTimeTrace()           # Always Update
+    cf.CHAIScale = float(eval(cf.CHAIsb.get()))
+    logging.debug('SetCHAIScale() with CHAIScale={}'.format(cf.CHAIScale))
+    UpdateTimeTrace() # Aenderung im Scopebild aktivieren
 
 def SetCHBVScale():
-    logging.debug('SetCHBVScale()')
-    try:
-        cf.CHBVScale = float(eval(cf.CHBVsb.get()))
-    except:
-        cf.CHBVsb.delete(0,tk.END)
-        cf.CHBVsb.insert(0, cf.CHBVScale)
-    UpdateTimeTrace()           # Always Update    
+    cf.CHBVScale = float(eval(cf.CHBVsb.get()))
+    logging.debug('SetCHBVScale() with CHBVScale={}'.format(cf.CHBVScale))
+    UpdateTimeTrace() # Aenderung im Scopebild aktivieren
 
 def SetCHBIScale():
-    logging.debug('SetCHBIScale()')
-    try:
-        cf.CHBIScale = float(eval(cf.CHBIsb.get()))
-    except:
-        cf.CHBIsb.delete(0,tk.END)
-        cf.CHBIsb.insert(0, cf.CHBIScale)
-    UpdateTimeTrace()           # Always Update    
+    cf.CHBIScale = float(eval(cf.CHBIsb.get()))
+    logging.debug('SetCHBIScale() with CHBIScale={}'.format(cf.CHBIScale))
+    UpdateTimeTrace() # Aenderung im Scopebild aktivieren
+    
 #--- Vertikalposition
 def SetCHAVPos(event):
     logging.debug('SetCHBVPos()')
@@ -466,18 +447,18 @@ def ConSingDev():
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++  
 # Toggle the Background and text colors based on ColorMode
 def BgColor():
-    global COLORcanvas
+    global CANVAS_COLOR
     if cf.ColorMode.get() > 0:
         cf.COLORtext = "#000000"   # 100% black
         cf.COLORtrace4 = "#a0a000" # 50% yellow
         cf.COLORtraceR4 = "#606000"   # 25% yellow
-        COLORcanvas = "#ffffff"     # 100% white
+        CANVAS_COLOR = "#ffffff"     # 100% white
     else:
         cf.COLORtext = "#ffffff"     # 100% white
         cf.COLORtrace4 = "#ffff00" # 100% yellow
         cf.COLORtraceR4 = "#808000"   # 50% yellow        
-        COLORcanvas = "#000000"   # 100% black
-    cf.ca.config(background=COLORcanvas)
+        CANVAS_COLOR = "#000000"   # 100% black
+    cf.ca.config(background=CANVAS_COLOR)
     UpdateTimeScreen()
 
 # Screenshot des Oszibilds als eps-Grafik speichern (Konvertierung via PIL in PNG ergibt eine
@@ -512,13 +493,11 @@ def BSaveData():
 
 # Function to close and exit ALICE
 def Bcloseexit():
-    logging.debug('Bcloseexit() Einstieg')
-    BStop()
-    logging.debug('Bcloseexit() nach BStop()')
+    logging.debug('Bcloseexit()')
+    stop_samp()
     time.sleep(0.2)
     cf.RUNstatus.set(0)
     cf.running = 0 # stop Analog_in() while loop
-    logging.debug('Bcloseexit() nach cf.running = 0')
     time.sleep(0.2)
     try:
         cf.devx.set_led(0b100) # LED auf Blau setzen
@@ -565,7 +544,6 @@ Triggermenu.menu.add_radiobutton(label='CA-I', variable=cf.TgInput, value=2)
 Triggermenu.menu.add_radiobutton(label='CB-V', variable=cf.TgInput, value=3)
 Triggermenu.menu.add_radiobutton(label='CB-I', variable=cf.TgInput, value=4)
 Triggermenu.menu.add_checkbutton(label='Low Pass Filter', variable=cf.LPFTrigger)
-#Triggermenu.menu.add_checkbutton(label='Manual Trgger', variable=cf.ManualTrigger)
 Triggermenu.menu.add_checkbutton(label='SingleShot', variable=cf.SingleShot)
 Triggermenu.pack(side=tk.LEFT)
 
@@ -600,17 +578,17 @@ tgb_tip = CreateToolTip(tgb, 'Triggerschwelle in die Mitte zwischen Signalminimu
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 bexit = ttk.Button(frame1, text="Exit", style="W4.TButton", command=Bcloseexit)
 bexit.pack(side=tk.RIGHT)
-bstop = ttk.Button(frame1, text="Stop", style="Stop.TButton", command=BStop)
-bstop.pack(side=tk.RIGHT)
-brun = ttk.Button(frame1, text="Run", style="Run.TButton", command=BStart)
-brun.pack(side=tk.RIGHT)
+stop_btn = ttk.Button(frame1, text="Stop", style="Stop.TButton", command=stop_samp)
+stop_btn.pack(side=tk.RIGHT)
+run_btn = ttk.Button(frame1, text="Run", style="Run.TButton", command=start_samp)
+run_btn.pack(side=tk.RIGHT)
 # M1K Connect action and status
 m1kcon = ttk.Button(frame1, text="M1K", style="RConn.TButton", command=ConSingDev)
 m1kcon.pack(side=tk.RIGHT)
 
 bexit_tip = CreateToolTip(bexit, 'Anwendung schließen')
-bstop_tip = CreateToolTip(bstop, 'Stop Datenaufnahme, Signalerzeugung und Aktualisierung Darstellung')
-brun_tip = CreateToolTip(brun, 'Start Datenaufnahme, Signalerzeugung und Aktualisierung Darstellung')
+stop_btn_tip = CreateToolTip(stop_btn, 'Stop Datenaufnahme, Signalerzeugung und Aktualisierung Darstellung')
+run_btn_tip = CreateToolTip(run_btn, 'Start Datenaufnahme, Signalerzeugung und Aktualisierung Darstellung')
 m1kcon_tip = CreateToolTip(m1kcon, 'M1K verbinden oder trennen, Grün = M1K verbunden')
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -631,9 +609,9 @@ cursor_tip = CreateToolTip(Cursormenu, 'xy-Cursor einschalten und auswählen wel
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Horizontal Menü: Time per Div
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-cf.TMsb = tk.Spinbox(frame1, width=5, values= cf.TMpdiv, command=BTime)
+cf.TMsb = tk.Spinbox(frame1, width=5, values= cf.TMpdiv, command=set_hscale)
 cf.TMsb.bind('<MouseWheel>', onSpinBoxScroll)
-cf.TMsb.bind("<Return>", BTime)
+cf.TMsb.bind("<Return>", set_hscale)
 cf.TMsb.pack(side=tk.RIGHT, padx=(0,16))
 cf.TMsb.delete(0,tk.END)
 cf.TMsb.insert(0,0.5)
@@ -642,7 +620,7 @@ cf.TMlab = ttk.Label(frame1, text="Horz Scale ms/Div:")
 cf.TMlab.pack(side=tk.RIGHT)
 
 cf.HozPosentry = tk.Entry(frame1, width=4)
-cf.HozPosentry.bind("<Return>", BHozPoss)
+cf.HozPosentry.bind("<Return>", set_hpos)
 cf.HozPosentry.pack(side=tk.RIGHT)
 cf.HozPosentry.delete(0,tk.END)
 cf.HozPosentry.insert(0,0.0)
@@ -657,7 +635,7 @@ time_tip = CreateToolTip(cf.TMsb, 'Horizontale Skalierung = Zeitbasis: Zeitabsta
 # Anzeigebereich für Traces
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Canvas (Anzeigebereich der Signale in frame2)
-cf.ca = tk.Canvas(frame2, width=cf.CANVASwidth, height=cf.CANVASheight, background=COLORcanvas, cursor='cross')
+cf.ca = tk.Canvas(frame2, width=cf.CANVASwidth, height=cf.CANVASheight, background=CANVAS_COLOR, cursor='cross')
 # add mouse left and right button click to cf.canvas
 cf.ca.bind('<Configure>', onCAresize)
 cf.ca.bind('<1>', onCanvasClickLeft)
@@ -706,17 +684,17 @@ mathmenu = ttk.Menubutton(dropmenu2, text="Math", style="Math.TButton")
 mathmenu.menu = tk.Menu(mathmenu, tearoff = 0 )
 mathmenu["menu"]  = mathmenu.menu
 mathmenu.menu.add_radiobutton(label='none', variable=cf.MathTrace, value=0, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CAV+CBV', variable=cf.MathTrace, value=1, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CAV-CBV', variable=cf.MathTrace, value=2, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CBV-CAV', variable=cf.MathTrace, value=3, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CAI-CBI', variable=cf.MathTrace, value=8, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CBI-CAI', variable=cf.MathTrace, value=9, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CAV*CAI', variable=cf.MathTrace, value=4, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CBV*CBI', variable=cf.MathTrace, value=5, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CAV/CAI', variable=cf.MathTrace, value=6, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CBV/CBI', variable=cf.MathTrace, value=7, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CBV/CAV', variable=cf.MathTrace, value=10, command=UpdateTimeTrace)
-mathmenu.menu.add_radiobutton(label='CBI/CAI', variable=cf.MathTrace, value=11, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CA-V+CB-V', variable=cf.MathTrace, value=1, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CA-V-CB-V', variable=cf.MathTrace, value=2, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CB-V-CA-V', variable=cf.MathTrace, value=3, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CA-I-CB-I', variable=cf.MathTrace, value=8, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CB-I-CA-I', variable=cf.MathTrace, value=9, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CA-I*CA-V [mW]', variable=cf.MathTrace, value=4, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CB-I*CB-V [mW]', variable=cf.MathTrace, value=5, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CA-V/CA-I [kOhm]', variable=cf.MathTrace, value=6, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CB-V/CB-I [kOhm]', variable=cf.MathTrace, value=7, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CB-V/CA-V', variable=cf.MathTrace, value=10, command=UpdateTimeTrace)
+mathmenu.menu.add_radiobutton(label='CB-I/CA-I', variable=cf.MathTrace, value=11, command=UpdateTimeTrace)
 mathmenu.pack(side=tk.LEFT)
 #--- Drop Down Menü zur Auswahl der Messfunktionen CHA
 MeasmenuA = ttk.Menubutton(dropmenu2, text="CA", style="W3.TButton")
@@ -786,10 +764,7 @@ CreateToolTip(curvelab, 'Auswahl der dargestellten Signalverläufe. Für 200 kS/
 SampMenu= ttk.Frame(frame2r)
 SampMenu.pack(side=tk.TOP, pady=(8,0))
 cf.SampRatesb = tk.Spinbox(SampMenu, width=6, values=cf.SampRateList, command=m1k.SetSampleRate)
-cf.SampRatesb.bind('<MouseWheel>', onSrateScroll)
-cf.SampRatesb.bind("<Button-4>", onSrateScroll)# with Linux OS
-cf.SampRatesb.bind("<Button-5>", onSrateScroll)
-cf.SampRatesb.bind("<Return>", onRetSrate)
+#cf.SampRatesb.bind("<Return>", onRetSrate)
 cf.SampRatesb.pack(side=tk.LEFT)
 cf.SampRatesb.delete(0,tk.END)
 cf.SampRatesb.insert(0,cf.SampRate) # mit 100 kS/s initialisieren
@@ -897,10 +872,10 @@ MakeAWGMenu()
 # Vertikaleinstellungen Gain und Offset für V und I der beiden Kanäle
 # Boxen unterhalb Oszibild
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-# Voltage channel A: Verschiedene V/Div - Werte siehe VScaleVals
+# Voltage channel A: Verschiedene V/Div - Werte siehe v_scale_vals
 CHAlab = ttk.Label(frame3, text="CA V/Div:", background=cf.COLORtrace1)
 CHAlab.pack(side=tk.LEFT)
-cf.CHAVsb = tk.Spinbox(frame3, width=5, values=VScaleVals, command=SetCHAVScale)
+cf.CHAVsb = tk.Spinbox(frame3, width=5, values=v_scale_vals, command=SetCHAVScale)
 cf.CHAVsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHAVsb.pack(side=tk.LEFT)
 cf.CHAVsb.delete(0,tk.END)
@@ -914,10 +889,10 @@ cf.CHAVPosEntry.pack(side=tk.LEFT, padx=(0,8))
 cf.CHAVPosEntry.delete(0,tk.END)
 cf.CHAVPosEntry.insert(0,2.5)
 
-# Current channel A: Verschiedene A/Div - Werte siehe IScaleVals
+# Current channel A: Verschiedene A/Div - Werte siehe i_scale_vals
 CHAIlab = ttk.Label(frame3, text="CA mA/Div:", background=cf.COLORtrace3)
 CHAIlab.pack(side=tk.LEFT)
-cf.CHAIsb = tk.Spinbox(frame3, width=5, values=IScaleVals, command=SetCHAIScale)
+cf.CHAIsb = tk.Spinbox(frame3, width=5, values=i_scale_vals, command=SetCHAIScale)
 cf.CHAIsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHAIsb.pack(side=tk.LEFT)
 cf.CHAIsb.delete(0,tk.END)
@@ -934,7 +909,7 @@ cf.CHAIPosEntry.insert(0,0.0)
 # Voltage channel B:
 CHBlab = ttk.Label(frame3, text="CB V/Div:", background=cf.COLORtrace2)
 CHBlab.pack(side=tk.LEFT)
-cf.CHBVsb = tk.Spinbox(frame3, width=5, values=VScaleVals, command=SetCHBVScale)
+cf.CHBVsb = tk.Spinbox(frame3, width=5, values=v_scale_vals, command=SetCHBVScale)
 cf.CHBVsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHBVsb.pack(side=tk.LEFT)
 cf.CHBVsb.delete(0,tk.END)
@@ -952,7 +927,7 @@ cf.CHBVPosEntry.insert(0,2.5)
 # Current channel B:
 CHBIlab = ttk.Label(frame3, text="CB mA/Div:", background=cf.COLORtrace4)
 CHBIlab.pack(side=tk.LEFT)
-cf.CHBIsb = tk.Spinbox(frame3, width=5, values=IScaleVals, command=SetCHBIScale)
+cf.CHBIsb = tk.Spinbox(frame3, width=5, values=i_scale_vals, command=SetCHBIScale)
 cf.CHBIsb.bind('<MouseWheel>', onSpinBoxScroll)
 cf.CHBIsb.pack(side=tk.LEFT)
 cf.CHBIsb.delete(0,tk.END)
@@ -967,7 +942,7 @@ cf.CHBIPosEntry.delete(0,tk.END)
 cf.CHBIPosEntry.insert(0,0.0)
 
 
-mathInfolab = ttk.Label(frame3, text="Math traces refer to CA scales")
+mathInfolab = ttk.Label(frame3, text="Math traces refer to first operand scale")
 mathInfolab.pack(side=tk.LEFT, padx=(8,0))
 
 # Tooltips für die Vertikaleinstellungen zu Channel A und B

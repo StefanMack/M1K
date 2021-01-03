@@ -8,9 +8,9 @@ S. Mack, 22.9.20
 import tkinter as tk
 import tkinter.ttk as ttk # nötig für Widget Styles
 #import platform
-from aliceAwgFunc import UpdateAwgCont
-from aliceAwgFunc import UpdateAWGA
-from aliceAwgFunc import UpdateAWGB
+from aliceAwgFunc import update_awg
+from aliceAwgFunc import update_awga
+from aliceAwgFunc import update_awgb
 import config as cf
 import logging
 
@@ -117,26 +117,26 @@ def MakeAWGMenu():
     ModeAMenu = ttk.Menubutton(cf.AWGAMenus, text="Mode", style="W5.TButton")
     ModeAMenu.menu = tk.Menu(ModeAMenu, tearoff = 0 )
     ModeAMenu["menu"] = ModeAMenu.menu
-    # 0 muss übergeben werden, da UpdateAwgCont() unten für Entrys benutzt wird, die Event übergeben
-    ModeAMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGAMode, value=0, command=UpdateAwgCont) 
-    ModeAMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGAMode, value=1, command=UpdateAwgCont) 
-    ModeAMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGAMode, value=2, command=UpdateAwgCont) 
+    # 0 muss übergeben werden, da update_awg() unten für Entrys benutzt wird, die Event übergeben
+    ModeAMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGAMode, value=0, command=update_awg) 
+    ModeAMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGAMode, value=1, command=update_awg) 
+    ModeAMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGAMode, value=2, command=update_awg) 
     ModeAMenu.pack(side=tk.LEFT, anchor=tk.W)
     ShapeAMenu = ttk.Menubutton(cf.AWGAMenus, text="Shape", style="W6.TButton")
     ShapeAMenu.menu = tk.Menu(ShapeAMenu, tearoff = 0 )
     ShapeAMenu["menu"] = ShapeAMenu.menu
-    ShapeAMenu.menu.add_radiobutton(label="DC", variable=cf.AWGAShape, value=0, command=UpdateAwgCont)
-    ShapeAMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGAShape, value=1, command=UpdateAwgCont)
-    ShapeAMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGAShape, value=2, command=UpdateAwgCont)
-    ShapeAMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGAShape, value=3, command=UpdateAwgCont)
-    ShapeAMenu.menu.add_radiobutton(label="Square", variable=cf.AWGAShape, value=4, command=UpdateAwgCont)
-    ShapeAMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGAShape, value=5, command=UpdateAwgCont)
+    ShapeAMenu.menu.add_radiobutton(label="DC", variable=cf.AWGAShape, value=0, command=update_awg)
+    ShapeAMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGAShape, value=1, command=update_awg)
+    ShapeAMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGAShape, value=2, command=update_awg)
+    ShapeAMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGAShape, value=3, command=update_awg)
+    ShapeAMenu.menu.add_radiobutton(label="Square", variable=cf.AWGAShape, value=4, command=update_awg)
+    ShapeAMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGAShape, value=5, command=update_awg)
     ShapeAMenu.pack(side=tk.LEFT, anchor=tk.W)
     # AWGA: Einstellung Min-/Maxwerte
     awg1ampl = ttk.Frame(cf.AWGASet)
     awg1ampl.pack(side=tk.TOP)
     cf.AWGAMinEntry = tk.Entry(awg1ampl, width=5)
-    cf.AWGAMinEntry.bind("<Return>", UpdateAwgCont) # Update nur bei Return
+    cf.AWGAMinEntry.bind("<Return>", update_awg) # Update nur bei Return
     cf.AWGAMinEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGAMinEntry.delete(0,tk.END)
     cf.AWGAMinEntry.insert(0,0.0)
@@ -145,7 +145,7 @@ def MakeAWGMenu():
     awg1off = ttk.Frame(cf.AWGASet)
     awg1off.pack(side=tk.TOP)
     cf.AWGAMaxEntry = tk.Entry(awg1off, width=5)
-    cf.AWGAMaxEntry.bind("<Return>", UpdateAwgCont)
+    cf.AWGAMaxEntry.bind("<Return>", update_awg)
     cf.AWGAMaxEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGAMaxEntry.delete(0,tk.END)
     cf.AWGAMaxEntry.insert(0,0.0)
@@ -155,7 +155,7 @@ def MakeAWGMenu():
     awg1freq = ttk.Frame(cf.AWGASet)
     awg1freq.pack(side=tk.TOP)
     cf.AWGAFreqEntry = tk.Entry(awg1freq, width=7)
-    cf.AWGAFreqEntry.bind("<Return>", UpdateAwgCont)
+    cf.AWGAFreqEntry.bind("<Return>", update_awg)
     cf.AWGAFreqEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGAFreqEntry.delete(0,tk.END)
     cf.AWGAFreqEntry.insert(0,100.0)
@@ -165,7 +165,7 @@ def MakeAWGMenu():
     awg1dc = ttk.Frame(cf.AWGASet)
     awg1dc.pack(side=tk.TOP)
     cf.AWGADutyCycleEntry = tk.Entry(awg1dc, width=5)
-    cf.AWGADutyCycleEntry.bind("<Return>", UpdateAwgCont)
+    cf.AWGADutyCycleEntry.bind("<Return>", update_awg)
     cf.AWGADutyCycleEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGADutyCycleEntry.delete(0,tk.END)
     cf.AWGADutyCycleEntry.insert(0,50)
@@ -175,25 +175,25 @@ def MakeAWGMenu():
     ModeBMenu = ttk.Menubutton(cf.AWGBMenus, text="Mode", style="W5.TButton")
     ModeBMenu.menu = tk.Menu(ModeBMenu, tearoff = 0 )
     ModeBMenu["menu"] = ModeBMenu.menu
-    ModeBMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGBMode, value=0, command=UpdateAwgCont)
-    ModeBMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGBMode, value=1, command=UpdateAwgCont)
-    ModeBMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGBMode, value=2, command=UpdateAwgCont)
+    ModeBMenu.menu.add_radiobutton(label="SVMI", variable=cf.AWGBMode, value=0, command=update_awg)
+    ModeBMenu.menu.add_radiobutton(label="SIMV", variable=cf.AWGBMode, value=1, command=update_awg)
+    ModeBMenu.menu.add_radiobutton(label="Hi-Z", variable=cf.AWGBMode, value=2, command=update_awg)
     ModeBMenu.pack(side=tk.LEFT, anchor=tk.W)
     ShapeBMenu = ttk.Menubutton(cf.AWGBMenus, text="Shape", style="W6.TButton")
     ShapeBMenu.menu = tk.Menu(ShapeBMenu, tearoff = 0 )
     ShapeBMenu["menu"] = ShapeBMenu.menu
-    ShapeBMenu.menu.add_radiobutton(label="DC", variable=cf.AWGBShape, value=0, command=UpdateAwgCont)
-    ShapeBMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGBShape, value=1, command=UpdateAwgCont)
-    ShapeBMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGBShape, value=2, command=UpdateAwgCont)
-    ShapeBMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGBShape, value=3, command=UpdateAwgCont)
-    ShapeBMenu.menu.add_radiobutton(label="Square", variable=cf.AWGBShape, value=4, command=UpdateAwgCont)
-    ShapeBMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGBShape, value=5, command=UpdateAwgCont)
+    ShapeBMenu.menu.add_radiobutton(label="DC", variable=cf.AWGBShape, value=0, command=update_awg)
+    ShapeBMenu.menu.add_radiobutton(label="Sine", variable=cf.AWGBShape, value=1, command=update_awg)
+    ShapeBMenu.menu.add_radiobutton(label="Triangle", variable=cf.AWGBShape, value=2, command=update_awg)
+    ShapeBMenu.menu.add_radiobutton(label="Sawtooth", variable=cf.AWGBShape, value=3, command=update_awg)
+    ShapeBMenu.menu.add_radiobutton(label="Square", variable=cf.AWGBShape, value=4, command=update_awg)
+    ShapeBMenu.menu.add_radiobutton(label="StairStep", variable=cf.AWGBShape, value=5, command=update_awg)
     ShapeBMenu.pack(side=tk.LEFT, anchor=tk.W)
     # AWGB: Einstellung Min-/Maxwerte
     awg2ampl = ttk.Frame(cf.AWGBSet)
     awg2ampl.pack(side=tk.TOP)
     cf.AWGBMinEntry = tk.Entry(awg2ampl, width=5)
-    cf.AWGBMinEntry.bind("<Return>", UpdateAwgCont)
+    cf.AWGBMinEntry.bind("<Return>", update_awg)
     cf.AWGBMinEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGBMinEntry.delete(0,tk.END)
     cf.AWGBMinEntry.insert(0,0.0)
@@ -202,7 +202,7 @@ def MakeAWGMenu():
     awg2off = ttk.Frame(cf.AWGBSet)
     awg2off.pack(side=tk.TOP)
     cf.AWGBMaxEntry = tk.Entry(awg2off, width=5)
-    cf.AWGBMaxEntry.bind("<Return>", UpdateAwgCont)
+    cf.AWGBMaxEntry.bind("<Return>", update_awg)
     cf.AWGBMaxEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGBMaxEntry.delete(0,tk.END)
     cf.AWGBMaxEntry.insert(0,0.0)
@@ -212,7 +212,7 @@ def MakeAWGMenu():
     awg2freq = ttk.Frame(cf.AWGBSet)
     awg2freq.pack(side=tk.TOP)
     cf.AWGBFreqEntry = tk.Entry(awg2freq, width=7)
-    cf.AWGBFreqEntry.bind("<Return>", UpdateAwgCont)
+    cf.AWGBFreqEntry.bind("<Return>", update_awg)
     cf.AWGBFreqEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGBFreqEntry.delete(0,tk.END)
     cf.AWGBFreqEntry.insert(0,100.0)
@@ -222,7 +222,7 @@ def MakeAWGMenu():
     awg2dc = ttk.Frame(cf.AWGBSet)
     awg2dc.pack(side=tk.TOP)
     cf.AWGBDutyCycleEntry = tk.Entry(awg2dc, width=5)
-    cf.AWGBDutyCycleEntry.bind("<Return>", UpdateAwgCont)
+    cf.AWGBDutyCycleEntry.bind("<Return>", update_awg)
     cf.AWGBDutyCycleEntry.pack(side=tk.LEFT, anchor=tk.W)
     cf.AWGBDutyCycleEntry.delete(0,tk.END)
     cf.AWGBDutyCycleEntry.insert(0,50)
@@ -240,9 +240,9 @@ def MakeAWGMenu():
     
 def UpdateAWGMenu():
     logging.debug('UpdateAWGMenu()')
-    UpdateAWGA()
-    UpdateAWGB()
-    UpdateAwgCont()
+    update_awga()
+    update_awgb()
+    update_awg()
 #--- Ende AWG Menü im Hauptfenster
 
 

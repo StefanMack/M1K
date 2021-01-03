@@ -2,11 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 22.9.20
-
-AWGXMaxvalue war vormals AWGXOffsetvalue
-AWGXMinvalue war vormals AWGXAmplvalue
-(X=A oder B)
+S. Mack, 2.1.21
 """
 
 import time
@@ -20,190 +16,186 @@ import tkinter as tk
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #--- Auslesen der in der UI gewählten Signalform
 
-def UpdateAwgCont(*dummy): # * damit mit und ohne Übergabe von Argumenten (z.B. Event)
-    logging.debug('UpdateAwgCont()')
+def update_awg(*dummy): # * damit mit und ohne Übergabe von Argumenten (z.B. Event)
+    logging.debug('update_awg()')
     # if running and in continuous streaming mode temp stop, flush buffer and restart to change AWG settings
     if (cf.RUNstatus.get() == 1):
         if cf.session.continuous:
             cf.session.end()
-            BAWGEnab() # set-up new AWG settings
-            time.sleep(0.01) # wait awhile here for some reason
-            logging.debug('vor cf.session.start(0)')
-            cf.session.start(0)
-
-def UpdateAwgContRet():
-    logging.debug('UpdateAwgContRet()')
-    UpdateAwgCont()
+            time.sleep(0.02)
+            setup_awg() # set-up new AWG settings
+            time.sleep(0.02) # wait awhile here for some reason
+            cf.session.start(0) #wieso hier das Argument '0'? Vermutlich kontinuierlicher Modus
     
-def BAWGEnab():
-    logging.debug('BAWGEnab()')
-    BAWGAMin()
-    BAWGAMax()
-    BAWGAFreq()
-    BAWGADutyCycle()
-    BAWGAShape()
-    BAWGBMin()
-    BAWGBMax()
-    BAWGBFreq()
-    BAWGBDutyCycle()
-    BAWGBShape()
-    UpdateAWGA()
-    UpdateAWGB()
+def setup_awg():
+    logging.debug('setup_awg()')
+    set_awga_min()
+    set_awga_max()
+    set_awga_freq()
+    set_awga_dutyc()
+    set_awga_shape()
+    set_awgb_min()
+    set_awgb_max()
+    set_awgb_freq()
+    set_awgb_dutyc()
+    set_awgb_shape()
+    update_awga()
+    update_awgb()
     
     
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Funktionen Arbitärgenerator CHA
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-AWGAMinvalue = 0.0
-AWGAMaxvalue = 0.0
-AWGAFreqvalue = 0.0
-AWGADutyCyclevalue = 50.0
-AWGAWave = 'dc' # Initialisierung Singalform
+awga_minval = 0.0
+awga_maxval = 0.0
+awga_freqval = 0.0
+awga_dutycval = 50.0
+awga_shape = 'dc' # Initialisierung Singalform
 
 #--- Min-Wert aus UI kontrollieren
-def BAWGAMin():
-    global AWGAMinvalue
+def set_awga_min():
+    global awga_minval
     try:
-        AWGAMinvalue = float(eval(cf.AWGAMinEntry.get()))
+        awga_minval = float(eval(cf.AWGAMinEntry.get()))
     except:
-        logging.debug('Exeption BAWGAMin()')
+        logging.debug('Exeption set_awga_min()')
         cf.AWGAMinEntry.delete(0,tk.END)
-        cf.AWGAMinEntry.insert(0, AWGAMinvalue)
+        cf.AWGAMinEntry.insert(0, awga_minval)
 
     if cf.AWGAMode.get() == 0: # Source Voltage measure current mode
-        if AWGAMinvalue > 5.00:
-            AWGAMinvalue = 5.00
+        if awga_minval > 5.00:
+            awga_minval = 5.00
             cf.AWGAMinEntry.delete(0,tk.END)
-            cf.AWGAMinEntry.insert(0, AWGAMinvalue)
-        if AWGAMinvalue < 0.00:
-            AWGAMinvalue = 0.00
+            cf.AWGAMinEntry.insert(0, awga_minval)
+        if awga_minval < 0.00:
+            awga_minval = 0.00
             cf.AWGAMinEntry.delete(0,tk.END)
-            cf.AWGAMinEntry.insert(0, AWGAMinvalue)
+            cf.AWGAMinEntry.insert(0, awga_minval)
 
     if cf.AWGAMode.get() == 1: # Source current measure voltage mode
-        if AWGAMinvalue > 200.00:
-            AWGAMinvalue = 200.00
+        if awga_minval > 200.00:
+            awga_minval = 200.00
             cf.AWGAMinEntry.delete(0,tk.END)
-            cf.AWGAMinEntry.insert(0, AWGAMinvalue)
-        if AWGAMinvalue < -200.00:
-            AWGAMinvalue = -200.00
+            cf.AWGAMinEntry.insert(0, awga_minval)
+        if awga_minval < -200.00:
+            awga_minval = -200.00
             cf.AWGAMinEntry.delete(0,tk.END)
-            cf.AWGAMinEntry.insert(0, AWGAMinvalue)
-    logging.debug('BAWGAMin() with {}'.format(AWGAMinvalue)) 
+            cf.AWGAMinEntry.insert(0, awga_minval)
+    logging.debug('set_awga_min() with {}'.format(awga_minval)) 
 #--- Max-Wert aus UI kontrollieren
-def BAWGAMax():
-    global AWGAMaxvalue
+def set_awga_max():
+    global awga_maxval
 
     try:
-        AWGAMaxvalue = float(eval(cf.AWGAMaxEntry.get()))
+        awga_maxval = float(eval(cf.AWGAMaxEntry.get()))
     except:
-        logging.debug('Exeption BAWGAMax()')
+        logging.debug('Exeption set_awga_max()')
         cf.AWGAMaxEntry.delete(0,tk.END)
-        cf.AWGAMaxEntry.insert(0, AWGAMaxvalue)
+        cf.AWGAMaxEntry.insert(0, awga_maxval)
 
     if cf.AWGAMode.get() == 0: # Source Voltage measure current mode
-        if AWGAMaxvalue > 5.00:
-            AWGAMaxvalue = 5.00
+        if awga_maxval > 5.00:
+            awga_maxval = 5.00
             cf.AWGAMaxEntry.delete(0,tk.END)
-            cf.AWGAMaxEntry.insert(0, AWGAMaxvalue)
-        if AWGAMaxvalue < 0.00:
-            AWGAMaxvalue = 0.00
+            cf.AWGAMaxEntry.insert(0, awga_maxval)
+        if awga_maxval < 0.00:
+            awga_maxval = 0.00
             cf.AWGAMaxEntry.delete(0,tk.END)
-            cf.AWGAMaxEntry.insert(0, AWGAMaxvalue)
+            cf.AWGAMaxEntry.insert(0, awga_maxval)
         
     if cf.AWGAMode.get() == 1: # Source current measure voltage mode
-        if AWGAMaxvalue > 200.00:
-            AWGAMaxvalue = 200.00
+        if awga_maxval > 200.00:
+            awga_maxval = 200.00
             cf.AWGAMaxEntry.delete(0,tk.END)
-            cf.AWGAMaxEntry.insert(0, AWGAMaxvalue)
-        if AWGAMaxvalue < -200.00:
-            AWGAMaxvalue = -200.00
+            cf.AWGAMaxEntry.insert(0, awga_maxval)
+        if awga_maxval < -200.00:
+            awga_maxval = -200.00
             cf.AWGAMaxEntry.delete(0,tk.END)
-            cf.AWGAMaxEntry.insert(0, AWGAMaxvalue)
-    logging.debug('BAWGAMax() with {}'.format(AWGAMaxvalue))
+            cf.AWGAMaxEntry.insert(0, awga_maxval)
+    logging.debug('set_awga_max() with {}'.format(awga_maxval))
 
 #--- Frequenz-Wert aus UI kontrollieren
-def BAWGAFreq():
-    global AWGAFreqvalue
+def set_awga_freq():
+    global awga_freqval
     
     try:
-        AWGAFreqvalue = float(eval(cf.AWGAFreqEntry.get()))
+        awga_freqval = float(eval(cf.AWGAFreqEntry.get()))
     except:
         cf.AWGAFreqEntry.delete(0,tk.END)
-        cf.AWGAFreqEntry.insert(0, AWGAFreqvalue)
-    if AWGAFreqvalue > 25000: # max freq is 25KHz
-        AWGAFreqvalue = 25000
+        cf.AWGAFreqEntry.insert(0, awga_freqval)
+    if awga_freqval > 25000: # max freq is 25KHz
+        awga_freqval = 25000
         cf.AWGAFreqEntry.delete(0,tk.END)
-        cf.AWGAFreqEntry.insert(0, AWGAFreqvalue)
-    if AWGAFreqvalue < 0: # Set negative frequency entry to 0
-        AWGAFreqvalue = 10
+        cf.AWGAFreqEntry.insert(0, awga_freqval)
+    if awga_freqval < 0: # Set negative frequency entry to 0
+        awga_freqval = 10
         cf.AWGAFreqEntry.delete(0,tk.END)
-        cf.AWGAFreqEntry.insert(0, AWGAFreqvalue)
-    logging.debug('BAWGAFreq() with {}'.format(AWGAFreqvalue))
+        cf.AWGAFreqEntry.insert(0, awga_freqval)
+    logging.debug('set_awga_freq() with {}'.format(awga_freqval))
 #--- Duty Cycle für Rechtecksignal kontrollieren        
-def BAWGADutyCycle():
-    global AWGADutyCyclevalue
+def set_awga_dutyc():
+    global awga_dutycval
     
     try:
-        AWGADutyCyclevalue = float(eval(cf.AWGADutyCycleEntry.get()))/100
+        awga_dutycval = float(eval(cf.AWGADutyCycleEntry.get()))/100
     except:
         cf.AWGADutyCycleEntry.delete(0,tk.END)
-        cf.AWGADutyCycleEntry.insert(0, AWGADutyCyclevalue)
+        cf.AWGADutyCycleEntry.insert(0, awga_dutycval)
 
-    if AWGADutyCyclevalue > 1: # max duty cycle is 100%
-        AWGADutyCyclevalue = 1
+    if awga_dutycval > 1: # max duty cycle is 100%
+        awga_dutycval = 1
         cf.AWGADutyCycleEntry.delete(0,tk.END)
-        cf.AWGADutyCycleEntry.insert(0, AWGADutyCyclevalue*100)
-    if AWGADutyCyclevalue < 0: # min duty cycle is 0%
-        AWGADutyCyclevalue = 0
+        cf.AWGADutyCycleEntry.insert(0, awga_dutycval*100)
+    if awga_dutycval < 0: # min duty cycle is 0%
+        awga_dutycval = 0
         cf.AWGADutyCycleEntry.delete(0,tk.END)
-        cf.AWGADutyCycleEntry.insert(0, AWGADutyCyclevalue)
-    logging.debug('BAWGADutyCycle() with {}'.format(AWGADutyCyclevalue))
+        cf.AWGADutyCycleEntry.insert(0, awga_dutycval)
+    logging.debug('set_awga_dutyc() with {}'.format(awga_dutycval))
 #--- Signalform aus UI lesen und als String setzen für späteren M1K-Befehl
-def BAWGAShape():
-    global AWGAWave
+def set_awga_shape():
+    global awga_shape
     
     if cf.AWGAShape.get() == 0:
-        AWGAWave = 'dc'
+        awga_shape = 'dc'
     if cf.AWGAShape.get() == 1:
-        AWGAWave = 'sine'
+        awga_shape = 'sine'
     if cf.AWGAShape.get() == 2:
-        AWGAWave = 'triangle'
+        awga_shape = 'triangle'
     if cf.AWGAShape.get() == 3:
-        AWGAWave = 'sawtooth'
+        awga_shape = 'sawtooth'
     if cf.AWGAShape.get() == 4:
-        AWGAWave = 'square'
+        awga_shape = 'square'
     if cf.AWGAShape.get() == 5:
-        AWGAWave = 'stairstep'
-    logging.debug('BAWGAShape() with {}'.format(AWGAWave))
+        awga_shape = 'stairstep'
+    logging.debug('set_awga_shape() with {}'.format(awga_shape))
 #--- Alle Einstellungen aus UI lesen und setzen
-def UpdateAWGA():
-    global AWGAMinvalue, AWGAMaxvalue, AWGAFreqvalue, AWGADutyCyclevalue
-    logging.debug('UpdateAWGA()')
-    BAWGAMin()
-    BAWGAMax()
-    BAWGAFreq()
-    BAWGADutyCycle()
-    BAWGAShape()    
+def update_awga():
+    global awga_minval, awga_maxval, awga_freqval, awga_dutycval
+    logging.debug('update_awga()')
+    set_awga_min()
+    set_awga_max()
+    set_awga_freq()
+    set_awga_dutyc()
+    set_awga_shape()    
     if cf.SampRate == 200000: # 200 kS/s bezieht sich nur auf ADC da durch Mux-Änderung
         AWGSampRate = 100000 # sonst nachfolgend falscher AWGAperiodvalue
     else:
         AWGSampRate = cf.SampRate
-    if AWGAFreqvalue > 0.0:
-        AWGAperiodvalue = AWGSampRate/AWGAFreqvalue
+    if awga_freqval > 0.0:
+        AWGAperiodvalue = AWGSampRate/awga_freqval
     else:
         AWGAperiodvalue = 0.0
     # Nur "Open termination", keine Auswahl 
     cf.devx.ctrl_transfer( 0x40, 0x51, 32, 0, 0, 0, 100) # set 2.5 V switch to open
     cf.devx.ctrl_transfer( 0x40, 0x51, 33, 0, 0, 0, 100) # set GND switch to open
       
-    if AWGAWave == 'dc':
+    if awga_shape == 'dc':
         if cf.AWGAMode.get() == 0: # Source Voltage measure current mode
             cf.CHA.mode = smu.Mode.SVMI # Put CHA in SVMI mode
-            cf.CHA.constant(AWGAMaxvalue)
+            cf.CHA.constant(awga_maxval)
         if cf.AWGAMode.get() == 1: # Source current measure voltage mode
             cf.CHA.mode = smu.Mode.SIMV # Put CHA in SIMV mode
-            cf.CHA.constant(AWGAMaxvalue/1000)
+            cf.CHA.constant(awga_maxval/1000)
         if cf.AWGAMode.get() == 2: # High impedance mode
             cf.CHA.mode = smu.Mode.HI_Z # Put CHA in Hi Z mode
 
@@ -212,24 +204,24 @@ def UpdateAWGA():
             cf.CHA.mode = smu.Mode.SVMI # Put CHA in SVMI mode
         if cf.AWGAMode.get() == 1: # Source current measure voltage mode
             cf.CHA.mode = smu.Mode.SIMV # Put CHA in SIMV mode
-            AWGAMaxvalue = AWGAMaxvalue/1000
-            AWGAMinvalue = AWGAMinvalue/1000
+            awga_maxval = awga_maxval/1000
+            awga_minval = awga_minval/1000
         if cf.AWGAMode.get() == 2: # High impedance mode
             cf.CHA.mode = smu.Mode.HI_Z # Put CHA in Hi Z mode
         else:
-            MaxV = AWGAMaxvalue
-            MinV = AWGAMinvalue
+            MaxV = awga_maxval
+            MinV = awga_minval
             # Delayvalue jeweils 0
             try:
-                if AWGAWave == 'sine':
+                if awga_shape == 'sine':
                     cf.CHA.sine(MaxV, MinV, AWGAperiodvalue, 0)
-                elif AWGAWave == 'triangle':
+                elif awga_shape == 'triangle':
                     cf.CHA.triangle(MaxV, MinV, AWGAperiodvalue, 0)
-                elif AWGAWave == 'sawtooth':
+                elif awga_shape == 'sawtooth':
                     cf.CHA.sawtooth(MaxV, MinV, AWGAperiodvalue, 0)
-                elif AWGAWave == 'square':
-                    cf.CHA.square(MaxV, MinV, AWGAperiodvalue, 0, AWGADutyCyclevalue)
-                elif AWGAWave == 'stairstep':
+                elif awga_shape == 'square':
+                    cf.CHA.square(MaxV, MinV, AWGAperiodvalue, 0, awga_dutycval)
+                elif awga_shape == 'stairstep':
                     cf.CHA.stairstep(MaxV, MinV, AWGAperiodvalue, 0)
             except:
                     pass
@@ -238,151 +230,151 @@ def UpdateAWGA():
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # Funktionen Arbitärgenerator CHB (Das Gleiche nochmals)
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-AWGBMinvalue = 0.0
-AWGBMaxvalue = 0.0
-AWGBFreqvalue = 0.0
-AWGBDutyCyclevalue = 50.0
-AWGBWave = 'dc'
+awgb_minval = 0.0
+awgb_maxval = 0.0
+awgb_freqval = 0.0
+awgb_dutycval = 50.0
+awgb_shape = 'dc'
   
-def BAWGBMin():
-    global AWGBMinvalue
+def set_awgb_min():
+    global awgb_minval
     try:
-        AWGBMinvalue = float(eval(cf.AWGBMinEntry.get()))
+        awgb_minval = float(eval(cf.AWGBMinEntry.get()))
     except:
         cf.AWGBMinEntry.delete(0,tk.END)
-        cf.AWGBMinEntry.insert(0, AWGBMinvalue)
+        cf.AWGBMinEntry.insert(0, awgb_minval)
     #
     if cf.AWGBMode.get() == 0: # Source Voltage measure current mode
-        if AWGBMinvalue > 5.00:
-            AWGBMinvalue = 5.00
+        if awgb_minval > 5.00:
+            awgb_minval = 5.00
             cf.AWGBMinEntry.delete(0,tk.END)
-            cf.AWGBMinEntry.insert(0, AWGBMinvalue)
-        if AWGBMinvalue < 0.00:
-            AWGBMinvalue = 0.00
+            cf.AWGBMinEntry.insert(0, awgb_minval)
+        if awgb_minval < 0.00:
+            awgb_minval = 0.00
             cf.AWGBMinEntry.delete(0,tk.END)
-            cf.AWGBMinEntry.insert(0, AWGBMinvalue)
+            cf.AWGBMinEntry.insert(0, awgb_minval)
 
     elif cf.AWGBMode.get() == 1: # Source current measure voltage mode
-        if AWGBMinvalue > 200.00:
-            AWGBMinvalue = 200.00
+        if awgb_minval > 200.00:
+            awgb_minval = 200.00
             cf.AWGBMinEntry.delete(0,tk.END)
-            cf.AWGBMinEntry.insert(0, AWGBMinvalue)
-        if AWGBMinvalue < -200.00:
-            AWGBMinvalue = -200.00
+            cf.AWGBMinEntry.insert(0, awgb_minval)
+        if awgb_minval < -200.00:
+            awgb_minval = -200.00
             cf.AWGBMinEntry.delete(0,tk.END)
-            cf.AWGBMinEntry.insert(0, AWGBMinvalue)
-    logging.debug('BAWGBMin() with {}'.format(AWGBMinvalue)) 
+            cf.AWGBMinEntry.insert(0, awgb_minval)
+    logging.debug('set_awgb_min() with {}'.format(awgb_minval)) 
 
-def BAWGBMax():
-    global AWGBMaxvalue
+def set_awgb_max():
+    global awgb_maxval
     try:
-        AWGBMaxvalue = float(eval(cf.AWGBMaxEntry.get()))
+        awgb_maxval = float(eval(cf.AWGBMaxEntry.get()))
     except:
         cf.AWGBMaxEntry.delete(0,tk.END)
-        cf.AWGBMaxEntry.insert(0, AWGBMaxvalue)
+        cf.AWGBMaxEntry.insert(0, awgb_maxval)
 
     if cf.AWGBMode.get() == 0: # Source Voltage measure current mode
-        if AWGBMaxvalue > 5.00:
-            AWGBMaxvalue = 5.00
+        if awgb_maxval > 5.00:
+            awgb_maxval = 5.00
             cf.AWGBMaxEntry.delete(0,tk.END)
-            cf.AWGBMaxEntry.insert(0, AWGBMaxvalue)
-        if AWGBMaxvalue < 0.00:
-            AWGBMaxvalue = 0.00
+            cf.AWGBMaxEntry.insert(0, awgb_maxval)
+        if awgb_maxval < 0.00:
+            awgb_maxval = 0.00
             cf.AWGBMaxEntry.delete(0,tk.END)
-            cf.AWGBMaxEntry.insert(0, AWGBMaxvalue)
+            cf.AWGBMaxEntry.insert(0, awgb_maxval)
     
     if cf.AWGBMode.get() == 1: # Source current measure voltage mode
-        if AWGBMaxvalue > 200.00:
-            AWGBMaxvalue = 200.00
+        if awgb_maxval > 200.00:
+            awgb_maxval = 200.00
             cf.AWGBMaxEntry.delete(0,tk.END)
-            cf.AWGBMaxEntry.insert(0, AWGBMaxvalue)
-        if AWGBMaxvalue < -200.00:
-            AWGBMaxvalue = -200.00
+            cf.AWGBMaxEntry.insert(0, awgb_maxval)
+        if awgb_maxval < -200.00:
+            awgb_maxval = -200.00
             cf.AWGBMaxEntry.delete(0,tk.END)
-            cf.AWGBMaxEntry.insert(0, AWGBMaxvalue)
-    logging.debug('BAWGBMax() with {}'.format(AWGBMaxvalue))
+            cf.AWGBMaxEntry.insert(0, awgb_maxval)
+    logging.debug('set_awgb_max() with {}'.format(awgb_maxval))
 
-def BAWGBFreq():
-    global AWGBFreqvalue
+def set_awgb_freq():
+    global awgb_freqval
     try:
-        AWGBFreqvalue = float(eval(cf.AWGBFreqEntry.get()))
+        awgb_freqval = float(eval(cf.AWGBFreqEntry.get()))
     except:
         cf.AWGBFreqEntry.delete(0,tk.END)
-        cf.AWGBFreqEntry.insert(0, AWGBFreqvalue)
+        cf.AWGBFreqEntry.insert(0, awgb_freqval)
 
-    if AWGBFreqvalue > 25000: # max freq is 25KHz
-        AWGBFreqvalue = 25000
+    if awgb_freqval > 25000: # max freq is 25KHz
+        awgb_freqval = 25000
         cf.AWGBFreqEntry.delete(0,tk.END)
-        cf.AWGBFreqEntry.insert(0, AWGBFreqvalue)
-    if AWGBFreqvalue < 0: # Set negative frequency entry to 0
-        AWGBFreqvalue = 10
+        cf.AWGBFreqEntry.insert(0, awgb_freqval)
+    if awgb_freqval < 0: # Set negative frequency entry to 0
+        awgb_freqval = 10
         cf.AWGBFreqEntry.delete(0,tk.END)
-        cf.AWGBFreqEntry.insert(0, AWGBFreqvalue)
-    logging.debug('BAWGBFreq() with {}'.format(AWGBFreqvalue))
+        cf.AWGBFreqEntry.insert(0, awgb_freqval)
+    logging.debug('set_awgb_freq() with {}'.format(awgb_freqval))
     
-def BAWGBDutyCycle():
-    global AWGBDutyCyclevalue
+def set_awgb_dutyc():
+    global awgb_dutycval
     try:
-        AWGBDutyCyclevalue = float(eval(cf.AWGBDutyCycleEntry.get()))/100
+        awgb_dutycval = float(eval(cf.AWGBDutyCycleEntry.get()))/100
     except:
         cf.AWGBDutyCycleEntry.delete(0,tk.END)
-        cf.AWGBDutyCycleEntry.insert(0, AWGBDutyCyclevalue)
+        cf.AWGBDutyCycleEntry.insert(0, awgb_dutycval)
 
-    if AWGBDutyCyclevalue > 1: # max duty cycle is 100%
-        AWGBDutyCyclevalue = 1
+    if awgb_dutycval > 1: # max duty cycle is 100%
+        awgb_dutycval = 1
         cf.AWGBDutyCycleEntry.delete(0,tk.END)
-        cf.AWGBDutyCycleEntry.insert(0, AWGBDutyCyclevalue*100)
-    if AWGBDutyCyclevalue < 0: # min duty cycle is 0%
-        AWGBDutyCyclevalue = 0
+        cf.AWGBDutyCycleEntry.insert(0, awgb_dutycval*100)
+    if awgb_dutycval < 0: # min duty cycle is 0%
+        awgb_dutycval = 0
         cf.AWGBDutyCycleEntry.delete(0,tk.END)
-        cf.AWGBDutyCycleEntry.insert(0, AWGBDutyCyclevalue)
-    logging.debug('BAWGBDutyCycle() with {}'.format(AWGBDutyCyclevalue))
+        cf.AWGBDutyCycleEntry.insert(0, awgb_dutycval)
+    logging.debug('set_awgb_dutyc() with {}'.format(awgb_dutycval))
     
-def BAWGBShape():
-    global AWGBWave
+def set_awgb_shape():
+    global awgb_shape
     if cf.AWGBShape.get() == 0:
-        AWGBWave = 'dc'
+        awgb_shape = 'dc'
     if cf.AWGBShape.get() == 1:
-        AWGBWave = 'sine'
+        awgb_shape = 'sine'
     if cf.AWGBShape.get() == 2:
-        AWGBWave = 'triangle'
+        awgb_shape = 'triangle'
     if cf.AWGBShape.get() == 3:
-        AWGBWave = 'sawtooth'
+        awgb_shape = 'sawtooth'
     if cf.AWGBShape.get() == 4:
-        AWGBWave = 'square'
+        awgb_shape = 'square'
     if cf.AWGBShape.get() == 5:
-        AWGBWave = 'stairstep'
-    logging.debug('BAWGBShape() with {}'.format(AWGBWave))
+        awgb_shape = 'stairstep'
+    logging.debug('set_awgb_shape() with {}'.format(awgb_shape))
     
-def UpdateAWGB():
-    logging.debug('UpdateAWGB()')
-    global AWGBMinvalue, AWGBMaxvalue, AWGBFreqvalue, AWGBDutyCyclevalue
+def update_awgb():
+    logging.debug('update_awgb()')
+    global awgb_minval, awgb_maxval, awgb_freqval, awgb_dutycval
     global CHA, CHB, amp2lab, off2lab
-    logging.debug('UpdateAWGA()')
-    BAWGBMin()
-    BAWGBMax()
-    BAWGBFreq()
-    BAWGBDutyCycle()
-    BAWGBShape()
+    logging.debug('update_awga()')
+    set_awgb_min()
+    set_awgb_max()
+    set_awgb_freq()
+    set_awgb_dutyc()
+    set_awgb_shape()
     if cf.SampRate == 200000: # 200 kS/s bezieht sich nur auf ADC da durch Mux-Änderung
         AWGSampRate = 100000 # sonst nachfolgend falscher AWGAperiodvalue
     else:
         AWGSampRate = cf.SampRate
-    if AWGBFreqvalue > 0.0:
-        AWGBperiodvalue = AWGSampRate/AWGBFreqvalue
+    if awgb_freqval > 0.0:
+        AWGBperiodvalue = AWGSampRate/awgb_freqval
     else:
         AWGBperiodvalue = 0.0     
     # Open termination
     cf.devx.ctrl_transfer( 0x40, 0x51, 37, 0, 0, 0, 100) # set 2.5 V switch to open
     cf.devx.ctrl_transfer( 0x40, 0x51, 38, 0, 0, 0, 100) # set GND switch to open
        
-    if AWGBWave == 'dc':
+    if awgb_shape == 'dc':
         if cf.AWGBMode.get() == 0: # Source Voltage measure current mode
             cf.CHB.mode = smu.Mode.SVMI # Put CHB in SVMI mode
-            cf.CHB.constant(AWGBMaxvalue)
+            cf.CHB.constant(awgb_maxval)
         if cf.AWGBMode.get() == 1: # Source current measure Voltage mode
             cf.CHB.mode = smu.Mode.SIMV # Put CHB in SIMV mode
-            cf.CHB.constant(AWGBMaxvalue/1000)
+            cf.CHB.constant(awgb_maxval/1000)
         if cf.AWGBMode.get() == 2: # Hi impedance mode:
             cf.CHB.mode = smu.Mode.HI_Z # Put CHB in Hi Z mode
     else:
@@ -390,23 +382,23 @@ def UpdateAWGB():
             cf.CHB.mode = smu.Mode.SVMI # Put CHB in SVMI mode
         if cf.AWGBMode.get() == 1: # Source current measure Voltage mode
             cf.CHB.mode = smu.Mode.SIMV # Put CHB in SIMV mode
-            AWGBMaxvalue = AWGBMaxvalue/1000
-            AWGBMinvalue = AWGBMinvalue/1000
+            awgb_maxval = awgb_maxval/1000
+            awgb_minval = awgb_minval/1000
         if cf.AWGBMode.get() == 2: # Hi impedance mode
             cf.CHB.mode = smu.Mode.HI_Z # Put CHB in Hi Z mode
         else:
-            MaxV = AWGBMaxvalue
-            MinV = AWGBMinvalue
+            MaxV = awgb_maxval
+            MinV = awgb_minval
             try: # keep going even if low level library returns an error
-                if AWGBWave == 'sine':
+                if awgb_shape == 'sine':
                     cf.CHB.sine(MaxV, MinV, AWGBperiodvalue, 0)
-                elif AWGBWave == 'triangle':
+                elif awgb_shape == 'triangle':
                     cf.CHB.triangle(MaxV, MinV, AWGBperiodvalue, 0)
-                elif AWGBWave == 'sawtooth':
+                elif awgb_shape == 'sawtooth':
                     cf.CHB.sawtooth(MaxV, MinV, AWGBperiodvalue, 0)
-                elif AWGBWave == 'square':
-                    cf.CHB.square(MaxV, MinV, AWGBperiodvalue, 0, AWGBDutyCyclevalue)
-                elif AWGBWave == 'stairstep':
+                elif awgb_shape == 'square':
+                    cf.CHB.square(MaxV, MinV, AWGBperiodvalue, 0, awgb_dutycval)
+                elif awgb_shape == 'stairstep':
                     cf.CHB.stairstep(MaxV, MinV, AWGBperiodvalue, 0)
             except:
                 pass

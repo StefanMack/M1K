@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Gehört zu aliceLite
-S. Mack, 22.9.20
+S. Mack, 2.1.21
 """
 import math
 import time
@@ -11,7 +11,7 @@ import tkinter as tk
 import tkinter.messagebox as tkm
 import pysmu as smu
 from aliceTimeFunc import MakeTimeTrace, MakeTimeScreen
-from aliceAwgFunc import BAWGEnab
+from aliceAwgFunc import setup_awg
 import config as cf
 import logging
 
@@ -22,8 +22,8 @@ PowerStatus = 1 # 0 stopped, 1 start, 2 running, 3 stop and restart, 4 stop
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     
 # Kontinuierliches Sampling beenden (Stopp-Taste in UI betätigt)
-def BStop():
-    logging.debug('BStop()')
+def stop_samp():
+    logging.debug('stop_samp()')
     if (cf.RUNstatus.get() == 1):
         cf.RUNstatus.set(0)
         cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z split mode
@@ -35,21 +35,21 @@ def BStop():
     UpdateTimeScreen()          # Always Update screens as necessary
 
 # Set Hor time scale from entry widget
-def BTime(*event): # * damit mit und ohne Übergabe von Argumenten (z.B. Event)
+def set_hscale(*event): # * damit mit und ohne Übergabe von Argumenten (z.B. Event)
     try: # get time scale in mSec/div
         cf.TIMEdiv = float(eval(cf.TMsb.get()))
     except:
         cf.TIMEdiv = 0.5
         cf.TMsb.delete(0,"end")
         cf.TMsb.insert(0,cf.TIMEdiv)
-    logging.debug('BTime() with TIMEdiv={}'.format(cf.TIMEdiv))
+    logging.debug('set_hscale() with TIMEdiv={}'.format(cf.TIMEdiv))
     if cf.RUNstatus.get() == 2:      # Restart if running
         cf.RUNstatus.set(4)
     UpdateTimeTrace()           # Always Update
 
-#---Set Horx possition from entry widget
-def BHozPoss(event):
-    logging.debug('BHozPoss()')
+#---Set Horx position from entry widget
+def set_hpos(event):
+    logging.debug('set_hpos()')
     HozPosLim = 5.0 * cf.TIMEdiv # Horizontaloffset maximal halbe Breite Grid
     try:
         HozPosVal = float(eval(cf.HozPosentry.get()))
@@ -63,17 +63,15 @@ def BHozPoss(event):
             cf.HozPosentry.insert(0, cf.HozPos)
         else:
             cf.HozPos = HozPosVal
-        logging.debug('BHozPoss() with cf.HozPos={} HowPosVal={}'.format(HozPosVal,cf.HozPos))
+        logging.debug('set_hpos() with cf.HozPos={} HowPosVal={}'.format(HozPosVal,cf.HozPos))
     except:
         cf.HozPosentry.delete(0,tk.END)
         cf.HozPosentry.insert(0, cf.HozPos)
 
 
 ## Start aquaring scope time data
-def BStart():
-    logging.debug('BStart()')
-    global PowerStatus
-#    global First_Slow_sweep
+def start_samp():
+    logging.debug('start_samp()')
     if cf.DevID == "No Device":
         tkm.showwarning("WARNING","No Device Plugged In!")
         return
@@ -81,9 +79,11 @@ def BStart():
         if (cf.RUNstatus.get() == 0):
             cf.RUNstatus.set(1)
             cf.session.flush()
+            time.sleep(0.02)
             cf.CHA.mode = smu.Mode.HI_Z_SPLIT # Put CHA in Hi Z mode
             cf.CHB.mode = smu.Mode.HI_Z_SPLIT # Put CHB in Hi Z mode
-            BAWGEnab()
+            time.sleep(0.02)
+            setup_awg()
             if not cf.session.continuous:
                 cf.session.start(0)
             time.sleep(0.02) # wait awhile here for some reason                   

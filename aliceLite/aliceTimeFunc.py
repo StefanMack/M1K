@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Gehört zu aliceLite
-S. Mack, 12.11.20
+Gehoert zu aliceLite
+S. Mack, 2.1.21
 """
 import tkinter as tk
 import config as cf
@@ -66,8 +66,6 @@ def MakeTimeTrace():
     if cf.TgInput.get() > 0: # Trigger auf Signal aktiv (nicht None)
         SCmin = - int(cf.NSamples * 0.25)
         SCmax = int(cf.NSamples * 0.25)
-        #SCmin = int(-1 * cf.TRIGGERsample) # erster Index für Darstellung # Wieso negativ?
-        #SCmax = int(cf.NSamples - cf.TRIGGERsample - 0) # letzter Index für Darstellung
     else:
         SCmin = 0 
         SCmax = cf.NSamples - 1
@@ -108,7 +106,7 @@ def MakeTimeTrace():
     if (DISsamples <= cf.GRW): # Weniger Abtastpunkte als die Breite des Grids (in Pixel)
         Xstep = cf.GRW / DISsamples
         logging.debug('MakeTimeTrace(): Weniger Abtastpunkte als Breite Grid, Xstep={}, cf.trgIpol={}'.format(Xstep,cf.trgIpol))
-        if cf.AWGBMode.get() == 2 and cf.Two_X_Sample == 0:
+        if cf.AWGBMode.get() == 2 and cf.SampRate != 200000: # Hi-Z -Modus Wieso das? Vermutlich weil Delta T nur halb so gross
             xa = int((Xstep/-2.5) - (Xstep*cf.trgIpol))
         else:
             xa = 0 - int(Xstep*cf.trgIpol) # adjust start pixel for interpolated trigger point
@@ -206,21 +204,21 @@ def MakeTimeTrace():
                         y1 = int(yMidGrid - YAVconv * (cf.VBuffA[t] - cf.VBuffB[t] - cf.CHAVPos))
                     elif cf.MathTrace.get() == 3: # plot difference of CB-V and CA-V 
                         y1 = int(yMidGrid - YBVconv * (cf.VBuffB[t] - cf.VBuffA[t] - cf.CHBVPos))
-                    elif cf.MathTrace.get() == 4: # plot product of CA-V and CA-I
-                        Ypower = cf.VBuffA[t] * cf.IBuffA[t] # mAmps * Volts = mWatts
-                        ytemp = YAIconv * (Ypower - cf.CHAIPos)
+                    elif cf.MathTrace.get() == 4: # plot product of CA-I and CA-V
+                        Ypower = cf.VBuffA[t] * cf.IBuffA[t] # mA * V = mW
+                        ytemp = YAIconv * (Ypower - cf.CHAIPos) # Skalierung wie mA aus CA-I
                         y1 = int(yMidGrid - ytemp)
-                    elif cf.MathTrace.get() == 5: # plot product of CB-V and CB-I
-                        Ypower = cf.VBuffB[t] * cf.IBuffB[t] # mAmps * Volts = mWatts
-                        ytemp = YBIconv * (Ypower - cf.CHBIPos)
+                    elif cf.MathTrace.get() == 5: # plot product of CB-I and CB-V
+                        Ypower = cf.VBuffB[t] * cf.IBuffB[t] # mA * V = mW
+                        ytemp = YBIconv * (Ypower - cf.CHBIPos) # Skalierung wie mA aus CB-I
                         y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 6: # plot ratio of CA-V and CA-I
-                        Yohms = cf.VBuffA[t] / (cf.IBuffA[t] / 1000.0) #  Volts / Amps = ohms
-                        ytemp = YAIconv * (Yohms - cf.CHAIPos)
+                        Yohms = cf.VBuffA[t] / (cf.IBuffA[t]) #  V / mA = kOhm
+                        ytemp = YAVconv * (Yohms - cf.CHAVPos)
                         y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 7: # plot ratio of CB-V and CB-I
-                        Yohms = cf.cf.VBuffB[t] / (cf.IBuffB[t] / 1000.0) #  Volts / Amps = ohms
-                        ytemp = YBIconv * (Yohms - cf.CHBIPos)
+                        Yohms = cf.VBuffB[t] / (cf.IBuffB[t]) #  V / mA = kOhm
+                        ytemp = YBVconv * (Yohms - cf.CHBVPos)
                         y1 = int(yMidGrid - ytemp)
                     elif cf.MathTrace.get() == 8: # plot difference of CA-I and CB-I
                         Ydif = (cf.IBuffA[t] - cf.IBuffB[t])#  in mA
@@ -457,7 +455,7 @@ def MakeTimeTrace():
     # Make trigger triangle pointer
     logging.debug('MakeTimeTrace(): Make trigger triangle pointer')
     Triggerline = []                # Trigger pointer
-    Triggersymbol = []                # Trigger symbol
+    Triggersymbol = []              # Trigger symbol
     if cf.TgInput.get() > 0:
         if cf.TgInput.get() == 1 : # triggering on CA-V
             x1 = cf.X0L

@@ -21,7 +21,7 @@ Weiter wurde die quelloffene Benutzeroberfläche "Alice Desktop 1.38" (siehe wik
 
 ![Screenshot AliceLite](/alicelite_screenshot.png)
 
-Download der WinPython-Distribution (WinPython 3.771) inkl. der IDE Spyder und der AliceLite Python-Quellcodedateien (v5.0 vom 12.11.20) als selbstentpackende ZIP-Datei (ca. 425 MB):  
+Download der WinPython-Distribution (WinPython 3.771) inkl. der IDE Spyder und der AliceLite Python-Quellcodedateien (v0.6 vom 3.1.21) als selbstentpackende ZIP-Datei (ca. 425 MB):  
 https://www.magentacloud.de/lnk/uoghlkxs
   
 Download Installationsdatei für M1K-Treiber, libsmu-Bibliothek (1.0.2) und Python-Bibliothek pysmu:  

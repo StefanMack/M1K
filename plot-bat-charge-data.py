@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 # Werte aus Textdatei in Array einlesen: Erste 5 Zeilen ignorieren, ';' als Trennzeichen
 # verwenden und nur die Spalten 0,1,6 und 7 einlesen.
-data = np.loadtxt('bat-charge_2.txt',skiprows=6, usecols=(0,1,6,7), delimiter=';')
+data = np.loadtxt('bat-charge_4.txt',skiprows=6, usecols=(0,1,6,7), delimiter=';')
 t = data[:,0]
 bat_charge = data[:,3]
 bat_volt = data[:,1]

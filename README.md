@@ -16,7 +16,7 @@ Nähere Infos siehe: wiki.analog.com/university/tools/m1k
 
 In diesem Repository befinden sich Python-Programmbeispiele, die auf dem Pythonpackage pysmu (Wrapper der C-Bibliothek libsmu siehe github.com/analogdevicesinc/libsmu) von Analog Devices basieren.
 
-Z.B. ist im Verzeichnis BattMeas eine Anwendung des M1K vorgestellt um den Verlauf der komplexen Impedanz und deren Abhähgigkeit von der Frequenz beim Ladevorgang eines Akkus zu messen. Hierzu kann das darin enthaltene Jupyter-Notebook unter folgendem Link im nbviewer angezeigt: [**Elektrische Eigenschaften von Akkus mit dem M1K messen**](https://nbviewer.jupyter.org/github/StefanMack/M1K/blob/master/BattMeas/BattMessM1k.ipynb)
+Z.B. ist im Verzeichnis `/BattMeas` eine Anwendung des M1K vorgestellt, um den Verlauf der komplexen Impedanz und deren Abhähgigkeit von der Frequenz beim Ladevorgang eines Akkus zu messen. Das Jupyter-Notebook hierzu wird unter folgendem Link im nbviewer angezeigt: [**Elektrische Eigenschaften von Akkus mit dem M1K messen**](https://nbviewer.jupyter.org/github/StefanMack/M1K/blob/master/BattMeas/BattMessM1k.ipynb)
 
 Weiter wurde die quelloffene Benutzeroberfläche "Alice Desktop 1.38" (siehe wiki.analog.com/university/tools/m1k/alice/desk-top-users-guide) von Analog Devices vereinfacht, debugged und mit deutschsprachigen Tooltips versehen. Die Studis können mit diesem Pythonmodul "AliceLite" das M1K als "virtuelles Instrument" auf ihren Rechnern verwenden. AliceLite wird als Teil einer WinPython-Distribution auf den PC geladen. Zusätzlich ist eine Treiberinstallation von Analog Devices nötig, welche die M1K-spezifischen Bibliotheken "libsmu" sowie "pysmu" installiert.
 

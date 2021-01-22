@@ -1,0 +1,64 @@
+# Example M1K calibration file assuming perfect operation (no offset or gain errors).
+#
+# See https://wiki.analog.com/university/tools/m1k-calibration to create a
+# calibration file for a real device.
+# Kalibierdatei für Rev. D, welche nur die Spannungsmessung (HI-Z) berücksichtigt.
+# Die Strommessung (SMVI) hat einen Offset < 1,2 mA. Die Spannungserzeugung
+# (SVMI) hat einen Fehler von < 0,2 %. Beide müssen vorerst nicht kalibriert werden.
+# S. Mack, 29.9.20
+
+# Channel A, measure V
+</>
+<0.0000, 0.0009>
+<2.4355, 2.3784>
+<\>
+
+# Channel A, measure I
+</>
+<0.0000, 0.0000>
+<0.1000, 0.1000>
+<-0.1000, -0.1000>
+<\>
+
+# Channel A, source V
+# Eingaben hier werden von Firmware falsch in Gain/Offset umgerechnet
+# Daher besser unverändert lassen, weil AWG 5 V an sich genauer als 0,2 %
+</>
+<0.0000, 0.0000>
+<2.5000, 2.5000>
+<\>
+
+# Channel A, source I
+</>
+<0.0000, 0.0000>
+<0.1000, 0.1000>
+<-0.1000, -0.1000>
+<\>
+
+# Channel B, measure V
+</>
+<0.0000, 0.0006>
+<2.4355, 2.3776>
+<\>
+
+# Channel B, measure I
+</>
+<0.0000, 0.0000>
+<0.1000, 0.1000>
+<-0.1000, -0.1000>
+<\>
+
+# Channel B, source V
+# Eingaben hier werden von Firmware falsch in Gain/Offset umgerechnet
+# Daher besser unverändert lassen, weil AWG 5 V an sich genauer als 0,2 %
+</>
+<0.0000, 0.0000>
+<2.5000, 2.5000>
+<\>
+
+# Channel B, source I
+</>
+<0.0000, 0.0000>
+<0.1000, 0.1000>
+<-0.1000, -0.1000>
+<\>

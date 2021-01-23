@@ -16,7 +16,7 @@ Funktionen wird ausgegeben.
 
 Gut geeignet zum Test ob Kurvenfit funktioniert.
 
-16.1.2021, S Mack
+23.1.2021, S Mack
 """
 
 import time
@@ -24,23 +24,27 @@ import numpy as np
 from pysmu import Session, Mode
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+import logging
 
+logging.basicConfig(level=30)
+logging.basicConfig(filename='logDatei.log', level=40)
 
-SAMP_RATE = 100000
-AWGB_IVAL_MIN = 20 # mA! 20 Minimum Sinus in mA
-AWGB_IVAL_MAX = 60 # mA ! 60 Maximum Sinus in mA
-FREQ = 140 # Frequenz in Hz
-WAIT_SATURATION = 10 # s 10 Wartezeit für Sättigung Batteriespannung
-NUM_PERIOD = 4 # 4 Anzahl der zu vermessenden Perioden
+SAMP_RATE = 100000 # 100.000 S/s - fest sonst einzelne Fehlmessungen
+AWGB_IVAL_MIN = 10 # mA! 20 Minimum Sinus in mA
+AWGB_IVAL_MAX = 30 # mA ! 60 Maximum Sinus in mA
+FREQ = 0.01 # > 0.01 - Frequenz in Hz
+WAIT_SATURATION = 10 # 10 s - Wartezeit für Sättigung Batteriespannung
+NUM_PERIOD = 1 # max 4 - Anzahl der zu vermessenden Perioden
 CURR_OFFSET = 0 # mA! M1K Offsetfehler Strommessung
-
-NUM_SAMPLES = np.round(SAMP_RATE*NUM_PERIOD/FREQ,0)
+NUM_SAMP_PER_PERIOD = 100 # Zahl Samples pro Periode zwischen 1-2*NUM_SAMP_PER_PERIOD
+#NUM_RAW_SAMPLES = int(np.round(SAMP_RATE*NUM_PERIOD/FREQ,0)) # Zahl Rohsamples M1K
+NUM_RAW_SAMPLES = int(SAMP_RATE*NUM_PERIOD/FREQ) # Zahl Rohsamples M1K
 
 def my_sin(x, omega, amplitude, phase, offset): # Sinusfunktion fuer Fit
     return np.sin(x * omega + phase) * amplitude + offset
 
 try:
-    session = Session(ignore_dataflow=True, sample_rate=SAMP_RATE, queue_size=NUM_SAMPLES)
+    session = Session(ignore_dataflow=True, sample_rate=SAMP_RATE, queue_size=NUM_RAW_SAMPLES)
     if session.devices:
         dev = session.devices[0]
         DevID = dev.serial
@@ -68,14 +72,16 @@ try:
         session.start(0)
         print('Anlegen des Sinusstroms für {} Sekunden zur Saettigung der Batteriespannung...'.format(WAIT_SATURATION))
         for time_step in range(0,WAIT_SATURATION,1):
-            print('\rnoch {} Sekunden'.format(WAIT_SATURATION-time_step), end='\r')
+            print('\rnoch {} Sekunden '.format(WAIT_SATURATION-time_step), end='\r')
             time.sleep(1)
         print('')
-        print('Start Messung: Frequenz={} Hz, i_min={} mA, i_max={} mA'.format(FREQ,AWGB_IVAL_MIN,AWGB_IVAL_MAX))
+        print('Start Messung: Frequenz={:7.3f} Hz, i_min={} mA, i_max={} mA, #Perioden={}, #Rohsamples={}'
+              .format(FREQ,AWGB_IVAL_MIN,AWGB_IVAL_MAX,NUM_PERIOD,NUM_RAW_SAMPLES))
     
+        time.sleep(0.5)
         adc_signal = dev.read(10000, -1, True)  # Dummy Abtasten sonst fehlerhafte Werte im Array
         time.sleep(0.2)
-        adc_signal = dev.read(NUM_SAMPLES, -1, True) # Samples aller vier Kanaele auslesen
+        adc_signal = dev.read(NUM_RAW_SAMPLES, -1, True) # Samples aller vier Kanaele auslesen
     
         cha_u_vals = [] # Buffer loeschen
         cha_i_vals = []
@@ -83,18 +89,23 @@ try:
         chb_i_vals = []
       
         index = 0
-        num_samples_real = NUM_SAMPLES
+        num_samples_real = NUM_RAW_SAMPLES
     
         if num_samples_real != len(adc_signal): # manchmal gibt ADC weniger Samples zurück als angefordert
             num_samples_real = len(adc_signal)
-            
-        while index < num_samples_real:
+        # Dezimierungsfaktor damit # Werte pro Periode zwischen 1* und 2*NUM_SAMP_PER_PERIOD
+        decimate = max(1,int(num_samples_real/(NUM_PERIOD*NUM_SAMP_PER_PERIOD)))
+        logging.warning('# Samples read: {}, decimate factor: {}'.format(num_samples_real,decimate))
+        
+        while index < (num_samples_real-num_samples_real%decimate): # %decimate damit immer 100 dezimierte Werte
             cha_u_vals.append(adc_signal[index][0][0])
             cha_i_vals.append(adc_signal[index][0][1])
             chb_u_vals.append(adc_signal[index][1][0])
             chb_i_vals.append(adc_signal[index][1][1])
-            index = index + 1
+
+            index = index + decimate # Dezimierung der gesampelten Werte 
         
+        num_data_dec = int(num_samples_real/decimate) # Anzahl dezimierter Werte
         cha_u_vals = np.asarray(cha_u_vals)
         chb_i_vals = np.asarray(chb_i_vals) - CURR_OFFSET/1000 # Offset Korrektur
         
@@ -109,7 +120,7 @@ try:
     
         voltage_norm = (cha_u_vals-u_ave)*2/(cha_u_vals.max()-cha_u_vals.min())
         current_norm = (chb_i_vals-i_ave)*2/(chb_i_vals.max()-chb_i_vals.min())
-        t = np.arange(0, NUM_SAMPLES/SAMP_RATE, 1/SAMP_RATE)*1000 # Abtastzeiten in ms
+        t = np.arange(0, num_data_dec*decimate/SAMP_RATE, 1/SAMP_RATE*decimate)*1000 # Abtastzeiten in ms
         
         fit_start_vals=[FREQ*2*np.pi, 1.0, 0.0, 0.0] # Startwerte Fit (Freq, Ampl, Phase, Offset)
         voltage_fit_result = curve_fit(my_sin, t/1000, voltage_norm, p0=fit_start_vals) # bounds funktionieren nicht richtig
@@ -124,12 +135,12 @@ try:
         else: # s.o.
             phase_current = current_fit_result[0][2] + np.pi
         
-        phase_shift_rad = (phase_current - phase_voltage)
-        if(phase_shift_rad<0): phase_shift_rad = phase_shift_rad + 2*np.pi # Phasenversatz u zu I immer positiv
+        phase_shift_rad = (phase_voltage - phase_current) # Kapazitiv: negativer Wert, Induktiv: positiver Wert
+        if(phase_shift_rad>np.pi): phase_shift_rad = phase_shift_rad - 2*np.pi # Phasenversatz u zu I in Bereich -pi...+pi
         phase_shift_deg = 180*phase_shift_rad/np.pi
         
         print('Phase U (rad): {:4.3f}  Phase I (rad): {:4.3f}'.format(phase_voltage,phase_current))
-        print('I zu U: Phasenversatz (rad/deg): {:4.3f}/{:4.3f}'.format(phase_shift_rad,phase_shift_deg))
+        print('U zu I: Phasenversatz (rad/deg): {:4.3f}/{:4.3f}'.format(phase_shift_rad,phase_shift_deg))
         
         voltage_fit = my_sin(t/1000, *voltage_fit_result[0])
         current_fit = my_sin(t/1000, *current_fit_result[0])

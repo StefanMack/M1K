@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 # Werte aus Textdatei in Array einlesen: Erste 6 Zeilen ignorieren, ';' als
 # Trennzeichen verwenden und nur Spalten 0, 5 und 6 einlesen.
-data = np.loadtxt('bat-freq-sweep-phase_2.txt',skiprows=6, usecols=(0,5,6), delimiter=';')
+data = np.loadtxt('bat-freq-sweep-phase_5.txt',skiprows=6, usecols=(0,5,6), delimiter=';')
 freq = data[:,0]
 bat_resistance = data[:,1]
 bat_phase = data[:,2]

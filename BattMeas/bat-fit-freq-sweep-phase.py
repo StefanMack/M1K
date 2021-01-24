@@ -14,7 +14,13 @@ Berechnet wird der differenzielle Widerstand = Wechselanteil(U_Bat)/Wechselantei
 Über einen Sinusfit jeweils von Spannung und Strom wird der Phasenversatz der
 beiden Werteverläufe bestimmt.
 
-16.1.2021, S Mack
+Die Samplingrate ist fest bei 100 kS/s, da bei niedrigereren Raten Fehlsamples auftauchen.
+Von den gesamptelten Werten werden pro Perdiode nur NUM_SAMP_PER_PERIOD Messwerte
+ausgewertet. D.h. die Werte werden nach dem Auslesung der Rohsamples dezimiert,
+damit der Fit schneller durchgeführt wird.
+
+
+23.1.2021, S Mack
 """
 
 import time
@@ -26,16 +32,19 @@ from scipy.optimize import curve_fit
 
 SAMP_RATE = 100000
 WAIT_FIRST_CHARGE = 10 # 10 Initiale Ladezeit vor der ersten Messung
-AWGB_IVAL_MIN = 20 # mA! 20 sollte gering sein damit während Sweep ähnlicher Ladezustand
-AWGB_IVAL_MAX = 60 # mA! 60 sollte ca. 20-40 mA groeßer sein als AWGB_IVAL_MIN
-START_FREQ = 4
-STOP_FREQ = 100
-FREQ_STEP = 2
-NUM_PERIOD = 4 # 4 Anzahl der zu vermessenden Perioden pro Frequenz
+AWGB_IVAL_MIN = 10 # mA! 20 sollte gering sein damit während Sweep ähnlicher Ladezustand
+AWGB_IVAL_MAX = 30 # mA! 60 sollte ca. 20-40 mA groeßer sein als AWGB_IVAL_MIN
+START_FREQ = 0.01
+STOP_FREQ = 10000.0
+FREQ_STEP = 0.01
+LOG = True # Falls True wird bei jedem Schritt die Frequenz um 50% erhöht FREQ_STEP wird ignoriert
+NUM_PERIOD = 1 # 4 Anzahl der zu vermessenden Perioden pro Frequenz
 TIME_STEP = 2 # 2 Wartezeit in Sekunden damit neue Frequenz eingeschwungen
 FILE_NAME = 'bat-freq-sweep-phase.txt' # Datei zum Abspeichern Messwerte
 CURR_OFFSET = 0 # mA! Offsetfehler M1K Strommessung
-NUM_SAMPLES_MAX = 100000 # maximale Zahl von Abtastungen
+NUM_RAW_SAMPLES = int(np.round(SAMP_RATE*NUM_PERIOD/START_FREQ,0)) # Zahl Rohsamples vom M1K (kleinste Frequenz)
+NUM_SAMP_PER_PERIOD = 100 # Zahl Samples pro Periode zwischen 1-2*NUM_SAMP_PER_PERIOD
+
 
 keep_going = True # Flag um While-Schleife der Messung zu beenden
 first_step = True # Flag für laengere Start-Ladezeit vor dem ersten Frquenzwert 
@@ -64,7 +73,7 @@ print()
 
 
 
-session = Session(ignore_dataflow=True, sample_rate=SAMP_RATE, queue_size=NUM_SAMPLES_MAX)
+session = Session(ignore_dataflow=True, sample_rate=SAMP_RATE, queue_size=NUM_RAW_SAMPLES)
 if session.devices:
     dev = session.devices[0]
     DevID = dev.serial
@@ -89,8 +98,10 @@ if session.devices:
     min_i = AWGB_IVAL_MIN/1000 # da Konstante in mA
     max_i = AWGB_IVAL_MAX/1000 # da Konstante in mA
     
-    for freq in range(START_FREQ,STOP_FREQ,FREQ_STEP):
-        num_samples = np.round(SAMP_RATE*NUM_PERIOD/freq,0)
+    freq = START_FREQ
+    while (freq<=STOP_FREQ):
+    #for freq in range(START_FREQ,STOP_FREQ,FREQ_STEP):
+        num_samples = int(np.round(SAMP_RATE*NUM_PERIOD/freq,0))
         if(keep_going):
             periodval = np.round(SAMP_RATE/freq,0)
             CHB.sine(max_i, min_i, periodval, 0)    
@@ -98,7 +109,7 @@ if session.devices:
             if first_step: # laengeres Aufladen vor Start Messung
                 print("Initiales Laden vor der ersten Messung...")
                 for time_step in range(0,WAIT_FIRST_CHARGE,1):
-                    print('\rnoch {} Sekunden'.format(WAIT_FIRST_CHARGE-time_step), end='\r')
+                    print('\rnoch {} Sekunden '.format(WAIT_FIRST_CHARGE-time_step), end='\r')
                     time.sleep(1)
                 print('')
                 print('Start Messung: Frequenz Start/Stopp/Delta: {}/{}/{} Hz, i_min={} mA, i_max={} mA'
@@ -110,7 +121,7 @@ if session.devices:
             time.sleep(TIME_STEP)
             adc_signal = dev.read(10000, -1, True)  # Dummy Auslesen, sonst fehlerhafte Werte im Array
             time.sleep(0.2)
-            adc_signal = dev.read(num_samples, -1, True) # Samples aller vier Kanäle auslesen (blocking) 
+            adc_signal = dev.read(num_samples, -1, True) # Samples aller vier Kanäle auslesen (blocking dauert teils sehr lange) 
     
             cha_u_vals = [] # Buffer loeschen
             cha_i_vals = []
@@ -121,14 +132,17 @@ if session.devices:
     
             if num_samples != len(adc_signal): # manchmal gibt ADC weniger Samples zurück als angefordert
                 num_samples = len(adc_signal)
+            # Dezimierungsfaktor damit # Werte pro Periode zwischen 1* und 2*NUM_SAMP_PER_PERIOD
+            decimate = max(1,int(num_samples/(NUM_PERIOD*NUM_SAMP_PER_PERIOD)))
                 
-            while index < num_samples:
+            while index < (num_samples-num_samples%decimate):
                 cha_u_vals.append(adc_signal[index][0][0])
                 cha_i_vals.append(adc_signal[index][0][1])
                 chb_u_vals.append(adc_signal[index][1][0])
                 chb_i_vals.append(adc_signal[index][1][1])
-                index = index + 1
+                index = index + decimate
             
+            num_data_dec = int(num_samples/(decimate)) # Anzahl dezimierter Werte
             cha_u_vals = np.asarray(cha_u_vals)
             chb_i_vals = 1000*np.asarray(chb_i_vals) - CURR_OFFSET # Offset Korrektur
             
@@ -141,7 +155,7 @@ if session.devices:
             
             voltage_norm = (cha_u_vals-u_ave)*2/(cha_u_vals.max()-cha_u_vals.min())
             current_norm = (chb_i_vals-i_ave)*2/(chb_i_vals.max()-chb_i_vals.min())
-            t = np.arange(0, num_samples/SAMP_RATE, 1/SAMP_RATE)*1000 # Abtastzeiten in ms (!)
+            t = np.arange(0, num_data_dec*decimate/SAMP_RATE, 1/SAMP_RATE*decimate)*1000 # Abtastzeiten in ms
             
             fit_start_vals=[freq*2*np.pi, 1.0, 0.0, 0.0] # Startwerte Fit (Freq, Ampl, Phase, Offset)
             voltage_fit_result = curve_fit(my_sin, t/1000, voltage_norm, p0=fit_start_vals) # /1000 da ms
@@ -156,16 +170,20 @@ if session.devices:
             else: # s.o.
                 phase_current = current_fit_result[0][2] + np.pi
             
-            phase_shift_rad = (phase_current - phase_voltage)
-            if(phase_shift_rad<0): phase_shift_rad = phase_shift_rad + 2*np.pi # Phasenversatz ist immer positiv
+            phase_shift_rad = (phase_voltage - phase_current) # Kapazitiv: negativer Wert, Induktiv: positiver Wert
+            if(phase_shift_rad>np.pi): phase_shift_rad = phase_shift_rad - 2*np.pi # Phasenversatz u zu I in Bereich -pi...+pi
             phase_shift_deg = 180*phase_shift_rad/np.pi
             
-            print("f={:4} Hz  DC: U={:5.3f} V, I={:7.4f} mA  AC: U={:8.6f} V, I={:7.4f} mA, R={:6.4f} Ohm  Phi={:5.3f} deg / {:4.4f} rad"\
+            print("f={:7.3f} Hz  DC: U={:5.3f} V, I={:7.4f} mA  AC: U={:8.6f} V, I={:7.4f} mA, R={:6.4f} Ohm  Phi={:5.3f} deg / {:4.4f} rad"\
             .format(freq, u_ave, i_ave, u_std, i_std, r_std, phase_shift_deg, phase_shift_rad))
-            meas_file.write("{};{:.3f};{:.4f};{:.4f};{:.4f};{:.3f};{:.4f};{:.5f}\n"\
+            meas_file.write("{:.3f};{:.3f};{:.4f};{:.4f};{:.4f};{:.3f};{:.4f};{:.5f}\n"\
             .format(freq, u_ave, i_ave, u_std, i_std, r_std, phase_shift_deg, phase_shift_rad))
             session.end()
             time.sleep(0.5)
+            if LOG: # fuer spaetere logarithmische Darstellung
+                freq=1.2*freq
+            else:
+                freq=freq + FREQ_STEP
         else:
             print('Programm wurde durch Return-Eingabe beendet.')
             break

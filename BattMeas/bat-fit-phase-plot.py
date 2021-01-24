@@ -14,6 +14,11 @@ Der Verlauf der Strom- und Spannungswerte wird im Plot dargestellt und es wird
 für jeden Velauf eine Sinusfunktion angefittet und der Phasenunterschied beider
 Funktionen wird ausgegeben.
 
+Die Samplingrate ist fest bei 100 kS/s, da bei niedrigereren Raten Fehlsamples auftauchen.
+Von den gesamptelten Werten werden pro Perdiode nur NUM_SAMP_PER_PERIOD Messwerte
+ausgewertet. D.h. die Werte werden nach dem Auslesung der Rohsamples dezimiert,
+damit der Fit und der Plot schneller durchgeführt werden.
+
 Gut geeignet zum Test ob Kurvenfit funktioniert.
 
 23.1.2021, S Mack

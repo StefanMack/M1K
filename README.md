@@ -23,7 +23,7 @@ Weiter wurde die quelloffene Benutzeroberfläche "Alice Desktop 1.38" (siehe wik
 
 ![Screenshot smuc](/smuc_screenshot.png)
 
-Download smuc als WinPython-Distribution (WinPython 3.771) inkl. der IDE Spyder und der smuc Python-Quellcodedateien (v0.6 vom 3.1.21) als selbstentpackende ZIP-Datei (ca. 425 MB):  
+Download smuc als WinPython-Distribution (WinPython 3.771) inkl. der IDE Spyder und der smuc Python-Quellcodedateien (v1.0 vom 22.1.21) als selbstentpackende ZIP-Datei (ca. 446 MB):  
 https://www.magentacloud.de/lnk/CaghFXci
   
 Download Installationsdatei für M1K-Treiber, libsmu-Bibliothek (1.0.2) und Python-Bibliothek pysmu:  
